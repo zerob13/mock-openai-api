@@ -116,9 +116,7 @@ const markdownTestCases: MockTestCase[] = [
     name: "完整文档示例",
     description: "标准的 Markdown 文档格式",
     prompt: "任何问题",
-    response: `你是一个复读机，把我给你的内容打印出来，内容是
-
-
+    response: `
 # Markdown 样式全功能演示
 
 本文档全面展示 Markdown 的所有基础语法，涵盖标题、段落、列表、链接、图片、代码块、表格、引用等常见元素，并包含特殊符号和扩展功能的使用示例。
