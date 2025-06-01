@@ -285,3 +285,77 @@ curl -X POST http://localhost:3000/v1/images/generations \
     "size": "1024x1024"
   }'
 ```
+
+### 使用 OpenAI SDK 测试
+
+```javascript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/v1',
+  apiKey: 'mock-key' // 可以是任意值
+});
+
+// 测试聊天完成
+const completion = await client.chat.completions.create({
+  model: 'mock-gpt-thinking',
+  messages: [{ role: 'user', content: '你好' }]
+});
+
+console.log(completion.choices[0].message.content);
+
+// 测试流式聊天
+const stream = await client.chat.completions.create({
+  model: 'mock-gpt-thinking',
+  messages: [{ role: 'user', content: '你好' }],
+  stream: true
+});
+
+for await (const chunk of stream) {
+  const content = chunk.choices[0]?.delta?.content || '';
+  process.stdout.write(content);
+}
+
+// 测试图像生成
+const image = await client.images.generate({
+  model: 'gpt-4o-image',
+  prompt: '一只可爱的橘猫',
+  n: 1,
+  size: '1024x1024'
+});
+
+console.log(image.data[0].url);
+```
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本项目
+2. 创建特性分支：`git checkout -b feature/AmazingFeature`
+3. 提交更改：`git commit -m 'Add some AmazingFeature'`
+4. 推送到分支：`git push origin feature/AmazingFeature`
+5. 提交 Pull Request
+
+## 📄 许可证
+
+本项目使用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+
+## 🔗 相关链接
+
+- [OpenAI API 文档](https://platform.openai.com/docs/api-reference)
+- [Express.js](https://expressjs.com/)
+- [TypeScript](https://www.typescriptlang.org/)
+
+## 💡 使用场景
+
+- **前端开发**: 无需等待后端 API，快速开发和测试 AI 功能
+- **API 集成测试**: 验证应用程序与 OpenAI API 的集成
+- **演示和原型**: 创建不依赖真实 AI 服务的演示
+- **开发调试**: 调试流式响应、函数调用等复杂场景
+- **成本控制**: 避免开发阶段的 API 调用费用
+- **离线开发**: 在没有网络的情况下开发 AI 应用
+
+## 🎉 结语
+
+Mock OpenAI API 让您能够快速、可靠地开发和测试 AI 应用，无需担心 API 配额、网络连接或费用问题。开始您的 AI 应用开发之旅吧！
