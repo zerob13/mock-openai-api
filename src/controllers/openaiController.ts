@@ -8,37 +8,38 @@ import {
 } from '../services/openaiService';
 
 /**
- * 获取模型列表
+ * Get model list
  */
 export function handleGetModels(req: Request, res: Response) {
   try {
     const models = getModels();
     res.json(models);
   } catch (error) {
-    console.error('获取模型列表错误:', error);
+    console.error('Get model list error:', error);
     res.status(500).json({
       error: {
-        message: '内部服务器错误',
-        type: 'internal_server_error'
+        message: 'Internal server error',
+        type: 'api_error',
+        code: 'internal_error'
       }
     });
   }
 }
 
 /**
- * 处理聊天完成请求
+ * Handle chat completion request
  */
-export function handleChatCompletions(req: Request, res: Response) {
+export function handleChatCompletion(req: Request, res: Response) {
   try {
     const request: ChatCompletionRequest = req.body;
     
-    // 基本验证
+    // Basic validation
     if (!request.model) {
       return res.status(400).json({
         error: {
-          message: '缺少必需的参数: model',
+          message: 'Missing required parameter: model',
           type: 'invalid_request_error',
-          param: 'model'
+          code: 'missing_parameter'
         }
       });
     }
@@ -46,91 +47,91 @@ export function handleChatCompletions(req: Request, res: Response) {
     if (!request.messages || !Array.isArray(request.messages) || request.messages.length === 0) {
       return res.status(400).json({
         error: {
-          message: '缺少必需的参数: messages',
+          message: 'Missing required parameter: messages',
           type: 'invalid_request_error',
-          param: 'messages'
+          code: 'missing_parameter'
         }
       });
     }
 
-    // 流式响应
+    // Streaming response
     if (request.stream) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', '*');
-      
-      // 刷新头部，确保客户端立即收到头部信息
+      res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+
+      // Flush headers to ensure client receives headers immediately
       res.flushHeaders();
-      
-      const streamGenerator = createChatCompletionStream(request);
-      
-      for (const chunk of streamGenerator) {
+
+      const stream = createChatCompletionStream(request);
+      for (const chunk of stream) {
         res.write(chunk);
       }
-      
       res.end();
     } else {
-      // 非流式响应
+      // Non-streaming response
       const completion = createChatCompletion(request);
       
-      // 检查是否是错误响应
-      if (completion.error) {
+      // Check if it's an error response
+      if ('error' in completion) {
         return res.status(400).json(completion);
       }
       
       res.json(completion);
     }
   } catch (error) {
-    console.error('聊天完成请求错误:', error);
+    console.error('Chat completion request error:', error);
     res.status(500).json({
       error: {
-        message: '内部服务器错误',
-        type: 'internal_server_error'
+        message: 'Internal server error',
+        type: 'api_error',
+        code: 'internal_error'
       }
     });
   }
 }
 
 /**
- * 处理图像生成请求
+ * Handle image generation request
  */
 export function handleImageGeneration(req: Request, res: Response) {
   try {
     const request: ImageGenerationRequest = req.body;
     
-    // 基本验证
+    // Basic validation
     if (!request.prompt) {
       return res.status(400).json({
         error: {
-          message: '缺少必需的参数: prompt',
+          message: 'Missing required parameter: prompt',
           type: 'invalid_request_error',
-          param: 'prompt'
+          code: 'missing_parameter'
         }
       });
     }
-
+    
     const imageResponse = generateImage(request);
     res.json(imageResponse);
   } catch (error) {
-    console.error('图像生成请求错误:', error);
+    console.error('Image generation request error:', error);
     res.status(500).json({
       error: {
-        message: '内部服务器错误',
-        type: 'internal_server_error'
+        message: 'Internal server error',
+        type: 'api_error',
+        code: 'internal_error'
       }
     });
   }
 }
 
 /**
- * 处理健康检查
+ * Handle health check
  */
 export function handleHealthCheck(req: Request, res: Response) {
   res.json({
     status: 'ok',
-    message: 'Mock OpenAI API 服务器正在运行',
+    message: 'Mock OpenAI API server is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });

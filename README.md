@@ -1,110 +1,119 @@
 # Mock OpenAI API
 
-一个完整的 OpenAI API 兼容的模拟服务器，无需调用真实的大模型，返回预定义的测试数据。非常适合开发、测试和调试使用 OpenAI API 的应用程序。
+[![NPM Version](https://img.shields.io/npm/v/mock-openai-api)](https://www.npmjs.com/package/mock-openai-api)
+[![GitHub License](https://img.shields.io/github/license/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Express.js](https://img.shields.io/badge/Express.js-404D59?style=flat&logo=express&logoColor=white)](https://expressjs.com/)
+[![GitHub Stars](https://img.shields.io/github/stars/zerob13/mock-openai-api?style=social)](https://github.com/zerob13/mock-openai-api)
+[![GitHub Forks](https://img.shields.io/github/forks/zerob13/mock-openai-api?style=social)](https://github.com/zerob13/mock-openai-api/fork)
 
-## 🚀 快速开始
+*[中文说明](README.zh.md) | English*
 
-### 安装
+A complete OpenAI API compatible mock server that returns predefined test data without calling real LLMs. Perfect for developing, testing, and debugging applications that use the OpenAI API.
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 npm install -g mock-openai-api
 ```
 
-### 启动服务器
+### Start Server
 
 ```bash
 npx mock-openai-api
 ```
 
-服务器将在 `http://localhost:3000` 启动。
+The server will start at `http://localhost:3000`.
 
-### 基本使用
+### Basic Usage
 
 ```bash
-# 获取模型列表
+# Get model list
 curl http://localhost:3000/v1/models
 
-# 聊天完成（非流式）
+# Chat completion (non-streaming)
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "你好"}]
+    "messages": [{"role": "user", "content": "Hello"}]
   }'
 
-# 聊天完成（流式）
+# Chat completion (streaming)
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "你好"}],
+    "messages": [{"role": "user", "content": "Hello"}],
     "stream": true
   }'
 
-# 图像生成
+# Image generation
 curl -X POST http://localhost:3000/v1/images/generations \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o-image",
-    "prompt": "一只可爱的猫咪",
+    "prompt": "A cute orange cat",
     "n": 1,
     "size": "1024x1024"
   }'
 ```
 
-## 🎯 特性
+## 🎯 Features
 
-- ✅ **完整的 OpenAI API 兼容性**
-- ✅ **支持流式和非流式聊天完成**
-- ✅ **支持函数调用**
-- ✅ **支持图像生成**
-- ✅ **预定义的测试场景**
-- ✅ **TypeScript 编写**
-- ✅ **易于集成和部署**
-- ✅ **详细的错误处理**
+- ✅ **Full OpenAI API Compatibility**
+- ✅ **Support for streaming and non-streaming chat completions**
+- ✅ **Function calling support**
+- ✅ **Image generation support**
+- ✅ **Predefined test scenarios**
+- ✅ **Written in TypeScript**
+- ✅ **Easy integration and deployment**
+- ✅ **Detailed error handling**
 
-## 📋 支持的 API 端点
+## 📋 Supported API Endpoints
 
-### 模型管理
-- `GET /v1/models` - 获取可用模型列表
-- `GET /models` - 兼容端点
+### Model Management
+- `GET /v1/models` - Get available model list
+- `GET /models` - Compatible endpoint
 
-### 聊天完成
-- `POST /v1/chat/completions` - 创建聊天完成
-- `POST /chat/completions` - 兼容端点
+### Chat Completions
+- `POST /v1/chat/completions` - Create chat completion
+- `POST /chat/completions` - Compatible endpoint
 
-### 图像生成
-- `POST /v1/images/generations` - 生成图像
-- `POST /images/generations` - 兼容端点
+### Image Generation
+- `POST /v1/images/generations` - Generate images
+- `POST /images/generations` - Compatible endpoint
 
-### 健康检查
-- `GET /health` - 服务器健康状态
+### Health Check
+- `GET /health` - Server health status
 
-## 🤖 可用模型
+## 🤖 Available Models
 
 ### 1. mock-gpt-thinking
-**思考型模型** - 显示推理过程，适合调试逻辑
+**Thinking Model** - Shows reasoning process, perfect for debugging logic
 
 ```json
 {
   "model": "mock-gpt-thinking",
-  "messages": [{"role": "user", "content": "计算 2+2"}]
+  "messages": [{"role": "user", "content": "Calculate 2+2"}]
 }
 ```
 
-响应会包含 `<thinking>` 标签显示思考过程。
+Response will include `<thinking>` tags showing the reasoning process.
 
 ### 2. mock-gpt-function
-**函数调用模型** - 支持工具和函数调用
+**Function Calling Model** - Supports tools and function calling
 
 ```json
 {
   "model": "mock-gpt-function",
-  "messages": [{"role": "user", "content": "今天北京的天气怎么样？"}],
+  "messages": [{"role": "user", "content": "What's the weather like in Beijing today?"}],
   "functions": [
     {
       "name": "get_weather",
-      "description": "获取天气信息",
+      "description": "Get weather information",
       "parameters": {
         "type": "object",
         "properties": {
@@ -118,97 +127,97 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```
 
 ### 3. mock-gpt-markdown
-**Markdown 示例模型** - 专门输出标准 Markdown 格式的纯文本模型
+**Markdown Sample Model** - Outputs standard Markdown format plain text
 
 ```json
 {
   "model": "mock-gpt-markdown",
-  "messages": [{"role": "user", "content": "任何问题"}]
+  "messages": [{"role": "user", "content": "Any question"}]
 }
 ```
 
-响应将是一个完整的 Markdown 文档，包含各种格式元素，适合前端 UI 调试。
-**注意：** 此模型专注于内容展示，不支持函数调用功能，保持输出的纯净性。
+Response will be a complete Markdown document with various formatting elements, perfect for frontend UI debugging.
+**Note:** This model focuses on content display and doesn't support function calling to maintain output purity.
 
 ### 4. gpt-4o-image
-**图像生成模型** - 专门用于图像生成
+**Image Generation Model** - Specialized for image generation
 
 ```json
 {
   "model": "gpt-4o-image",
-  "prompt": "一只可爱的橘猫在阳光下玩耍",
+  "prompt": "A cute orange cat playing in sunlight",
   "n": 2,
   "size": "1024x1024",
   "quality": "hd"
 }
 ```
 
-支持多种尺寸和质量设置，返回高质量的模拟图像。
+Supports various sizes and quality settings, returns high-quality simulated images.
 
-## 🛠️ 开发
+## 🛠️ Development
 
-### 本地开发
+### Local Development
 
 ```bash
-# 克隆项目
+# Clone project
 git clone https://github.com/zerob13/mock-openai-api.git
 cd mock-openai-api
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 开发模式运行
+# Run in development mode
 npm run dev
 
-# 构建项目
+# Build project
 npm run build
 
-# 生产模式运行
+# Run in production mode
 npm start
 ```
 
-### 项目结构
+### Project Structure
 
 ```
 src/
-├── types/          # TypeScript 类型定义
-├── data/           # 预定义的测试数据
-├── utils/          # 工具函数
-├── services/       # 业务逻辑服务
-├── controllers/    # 路由控制器
-├── routes/         # 路由定义
-├── app.ts          # Express 应用设置
-├── index.ts        # 服务器启动
-└── cli.ts          # CLI 工具入口
+├── types/          # TypeScript type definitions
+├── data/           # Predefined test data
+├── utils/          # Utility functions
+├── services/       # Business logic services
+├── controllers/    # Route controllers
+├── routes/         # Route definitions
+├── app.ts          # Express app setup
+├── index.ts        # Server startup
+└── cli.ts          # CLI tool entry
 ```
 
-### 添加新的测试场景
+### Adding New Test Scenarios
 
-1. 在 `src/data/mockData.ts` 中添加新的测试用例
-2. 可以为现有模型添加测试用例，或创建新的模型类型
-3. 重新构建项目：`npm run build`
+1. Add new test cases in `src/data/mockData.ts`
+2. You can add test cases for existing models or create new model types
+3. Rebuild the project: `npm run build`
 
-示例：
+Example:
 
 ```typescript
 const newTestCase: MockTestCase = {
-  name: "新功能测试",
-  description: "测试新功能的描述",
-  prompt: "触发关键词",
-  response: "预期的响应内容",
-  streamChunks: ["分段", "流式", "内容"], // 可选
-  functionCall: { // 可选，仅用于 function 类型模型
+  name: "New Feature Test",
+  description: "Description of new feature test",
+  prompt: "trigger keyword",
+  response: "Expected response content",
+  streamChunks: ["chunked", "streaming", "content"], // optional
+  functionCall: { // optional, only for function type models
     name: "function_name",
     arguments: { param: "value" }
   }
 };
 ```
 
-## 🌐 部署
+## 🌐 Deployment
 
-### Docker 部署
+### Docker Deployment
 
-创建 `Dockerfile`:
+Create `Dockerfile`:
 
 ```dockerfile
 FROM node:18-alpine
@@ -220,95 +229,95 @@ EXPOSE 3000
 CMD ["node", "dist/index.js"]
 ```
 
-构建和运行：
+Build and run:
 
 ```bash
 docker build -t mock-openai-api .
 docker run -p 3000:3000 mock-openai-api
 ```
 
-### 环境变量
+### Environment Variables
 
-- `PORT` - 服务器端口（默认：3000）
-- `HOST` - 服务器主机（默认：0.0.0.0）
+- `PORT` - Server port (default: 3000)
+- `HOST` - Server host (default: 0.0.0.0)
 
-## 🧪 测试
+## 🧪 Testing
 
-### 使用 curl 测试
+### Testing with curl
 
 ```bash
-# 测试健康检查
+# Test health check
 curl http://localhost:3000/health
 
-# 测试模型列表
+# Test model list
 curl http://localhost:3000/v1/models
 
-# 测试思考型模型
+# Test thinking model
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "解释一下递归"}]
+    "messages": [{"role": "user", "content": "Explain recursion"}]
   }'
 
-# 测试函数调用
+# Test function calling
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "mock-gpt-function",
-    "messages": [{"role": "user", "content": "现在几点了？"}]
+    "messages": [{"role": "user", "content": "What time is it now?"}]
   }'
 
-# 测试 Markdown 输出
+# Test Markdown output
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "mock-gpt-markdown",
-    "messages": [{"role": "user", "content": "任何内容"}]
+    "messages": [{"role": "user", "content": "Any content"}]
   }'
 
-# 测试流式输出
+# Test streaming output
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "讲个故事"}],
+    "messages": [{"role": "user", "content": "Tell me a story"}],
     "stream": true
   }'
 
-# 测试图像生成
+# Test image generation
 curl -X POST http://localhost:3000/v1/images/generations \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o-image",
-    "prompt": "一只可爱的橘猫",
+    "prompt": "A cute orange cat",
     "n": 2,
     "size": "1024x1024"
   }'
 ```
 
-### 使用 OpenAI SDK 测试
+### Testing with OpenAI SDK
 
 ```javascript
 import OpenAI from 'openai';
 
 const client = new OpenAI({
   baseURL: 'http://localhost:3000/v1',
-  apiKey: 'mock-key' // 可以是任意值
+  apiKey: 'mock-key' // can be any value
 });
 
-// 测试聊天完成
+// Test chat completion
 const completion = await client.chat.completions.create({
   model: 'mock-gpt-thinking',
-  messages: [{ role: 'user', content: '你好' }]
+  messages: [{ role: 'user', content: 'Hello' }]
 });
 
 console.log(completion.choices[0].message.content);
 
-// 测试流式聊天
+// Test streaming chat
 const stream = await client.chat.completions.create({
   model: 'mock-gpt-thinking',
-  messages: [{ role: 'user', content: '你好' }],
+  messages: [{ role: 'user', content: 'Hello' }],
   stream: true
 });
 
@@ -317,10 +326,10 @@ for await (const chunk of stream) {
   process.stdout.write(content);
 }
 
-// 测试图像生成
+// Test image generation
 const image = await client.images.generate({
   model: 'gpt-4o-image',
-  prompt: '一只可爱的橘猫',
+  prompt: 'A cute orange cat',
   n: 1,
   size: '1024x1024'
 });
@@ -328,35 +337,35 @@ const image = await client.images.generate({
 console.log(image.data[0].url);
 ```
 
-## 🤝 贡献
+## 🤝 Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
-1. Fork 本项目
-2. 创建特性分支：`git checkout -b feature/AmazingFeature`
-3. 提交更改：`git commit -m 'Add some AmazingFeature'`
-4. 推送到分支：`git push origin feature/AmazingFeature`
-5. 提交 Pull Request
+1. Fork this project
+2. Create a feature branch: `git checkout -b feature/AmazingFeature`
+3. Commit your changes: `git commit -m 'Add some AmazingFeature'`
+4. Push to the branch: `git push origin feature/AmazingFeature`
+5. Submit a Pull Request
 
-## 📄 许可证
+## 📄 License
 
-本项目使用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## 🔗 相关链接
+## 🔗 Related Links
 
-- [OpenAI API 文档](https://platform.openai.com/docs/api-reference)
+- [OpenAI API Documentation](https://platform.openai.com/docs/api-reference)
 - [Express.js](https://expressjs.com/)
 - [TypeScript](https://www.typescriptlang.org/)
 
-## 💡 使用场景
+## 💡 Use Cases
 
-- **前端开发**: 无需等待后端 API，快速开发和测试 AI 功能
-- **API 集成测试**: 验证应用程序与 OpenAI API 的集成
-- **演示和原型**: 创建不依赖真实 AI 服务的演示
-- **开发调试**: 调试流式响应、函数调用等复杂场景
-- **成本控制**: 避免开发阶段的 API 调用费用
-- **离线开发**: 在没有网络的情况下开发 AI 应用
+- **Frontend Development**: Rapidly develop and test AI features without waiting for backend API
+- **API Integration Testing**: Verify application integration with OpenAI API
+- **Demos and Prototypes**: Create demos that don't depend on real AI services
+- **Development Debugging**: Debug streaming responses, function calls, and other complex scenarios
+- **Cost Control**: Avoid API call costs during development phase
+- **Offline Development**: Develop AI applications without internet connection
 
-## 🎉 结语
+## 🎉 Conclusion
 
-Mock OpenAI API 让您能够快速、可靠地开发和测试 AI 应用，无需担心 API 配额、网络连接或费用问题。开始您的 AI 应用开发之旅吧！
+Mock OpenAI API enables you to quickly and reliably develop and test AI applications without worrying about API quotas, network connections, or costs. Start your AI application development journey today!

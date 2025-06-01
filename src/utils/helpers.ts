@@ -2,64 +2,64 @@ import { MockModel, MockTestCase } from '../types';
 import { mockModels } from '../data/mockData';
 
 /**
- * 生成唯一的聊天完成 ID
+ * Generate unique chat completion ID
  */
 export function generateChatCompletionId(): string {
   return `chatcmpl-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
- * 生成唯一的图像生成 ID
+ * Generate unique image ID
  */
 export function generateImageId(): string {
   return `img-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
- * 获取当前时间戳
+ * Get current timestamp
  */
 export function getCurrentTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
 
 /**
- * 根据模型 ID 查找模型
+ * Find model by ID
  */
 export function findModelById(modelId: string): MockModel | undefined {
   return mockModels.find(model => model.id === modelId);
 }
 
 /**
- * 根据用户输入选择最匹配的测试用例
+ * Select the most matching test case based on user input
  */
 export function selectTestCase(model: MockModel, userPrompt: string): MockTestCase {
   const prompt = userPrompt.toLowerCase().trim();
   
-  // 数字匹配逻辑 - 更宽泛的匹配，只要包含数字就认为命中
+  // Number matching logic - broader matching, consider it a hit if it contains numbers
   const numberMatch = prompt.match(/(\d+)/);
   if (numberMatch) {
-    const index = parseInt(numberMatch[1]) - 1; // 转换为0基索引
+    const index = parseInt(numberMatch[1]) - 1; // Convert to 0-based index
     if (index >= 0 && index < model.testCases.length) {
       return model.testCases[index];
     }
-    // 数字超出范围，返回帮助信息
+    // Number out of range, return help information
     return createHelpTestCase(model, userPrompt);
   }
   
-  // 直接匹配测试用例的prompt
+  // Direct matching of test case prompts
   for (const testCase of model.testCases) {
     if (testCase.prompt.toLowerCase().trim() === prompt) {
       return testCase;
     }
   }
   
-  // 关键词匹配
-  const greetingKeywords = ['你好', 'hello', 'hi', '您好'];
-  const mathKeywords = ['计算', '加', '减', '乘', '除', '+', '-', '*', '/', 'calculate', 'math'];
-  const programmingKeywords = ['python', 'javascript', 'code', '代码', '编程', '程序'];
-  const helpKeywords = ['help', '帮助', '?', '？', 'list'];
+  // Keyword matching
+  const greetingKeywords = ['hello', 'hi', 'hey', 'greetings'];
+  const mathKeywords = ['calculate', 'add', 'subtract', 'multiply', 'divide', '+', '-', '*', '/', 'math'];
+  const programmingKeywords = ['python', 'javascript', 'code', 'programming', 'program', 'create', 'list'];
+  const helpKeywords = ['help', '?', 'list', 'show'];
   
-  // 帮助关键词匹配
+  // Help keyword matching
   if (helpKeywords.some(keyword => prompt.includes(keyword))) {
     return createHelpTestCase(model, userPrompt);
   }
@@ -67,8 +67,8 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   if (greetingKeywords.some(keyword => prompt.includes(keyword))) {
     const greetingCase = model.testCases.find(tc => 
       greetingKeywords.some(kw => tc.prompt.toLowerCase().includes(kw)) ||
-      tc.name.toLowerCase().includes('默认') ||
-      tc.name.toLowerCase().includes('回复')
+      tc.name.toLowerCase().includes('default') ||
+      tc.name.toLowerCase().includes('reply')
     );
     if (greetingCase) return greetingCase;
   }
@@ -76,7 +76,7 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   if (mathKeywords.some(keyword => prompt.includes(keyword))) {
     const mathCase = model.testCases.find(tc => 
       mathKeywords.some(kw => tc.prompt.toLowerCase().includes(kw)) ||
-      tc.name.toLowerCase().includes('数学')
+      tc.name.toLowerCase().includes('math')
     );
     if (mathCase) return mathCase;
   }
@@ -84,105 +84,108 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   if (programmingKeywords.some(keyword => prompt.includes(keyword))) {
     const progCase = model.testCases.find(tc => 
       programmingKeywords.some(kw => tc.prompt.toLowerCase().includes(kw)) ||
-      tc.name.toLowerCase().includes('编程')
+      tc.name.toLowerCase().includes('programming')
     );
     if (progCase) return progCase;
   }
   
-  // 如果没有匹配，返回帮助信息
-  return createHelpTestCase(model, userPrompt);
+  // Default to first test case
+  return model.testCases[0] || createHelpTestCase(model, userPrompt);
 }
 
 /**
- * 为模型创建帮助测试用例
+ * Create help test case for model
  */
 function createHelpTestCase(model: MockModel, userInput?: string): MockTestCase {
   const caseList = model.testCases.map((testCase, index) => 
-    `${index + 1}. ${testCase.name} - ${testCase.description}\n   示例: "${testCase.prompt}"`
+    `${index + 1}. ${testCase.name} - ${testCase.description}\n   Example: "${testCase.prompt}"`
   ).join('\n\n');
   
-  const userInputSection = userInput ? `## 您的输入：\n"${userInput}"\n\n` : '';
+  const userInputSection = userInput ? `## Your Input:\n"${userInput}"\n\n` : '';
   
-  const helpContent = `# ${model.name} 可用测试用例
+  const helpContent = `# ${model.name} Available Test Cases
 
-${userInputSection}以下是当前模型支持的测试用例，您可以：
-- 输入包含数字的内容选择对应的测试用例（如"1"、"选择第2个"、"我要3"等）
-- 输入相关关键词进行匹配
-- 直接输入示例提示词
+${userInputSection}The following are the test cases supported by the current model. You can:
+- Enter content containing numbers to select corresponding test cases (like "1", "select 2nd", "I want 3", etc.)
+- Enter related keywords for matching
+- Enter example prompts directly
 
-## 可用测试用例：
+## Available Test Cases:
 
 ${caseList}
 
 ---
 
-💡 **使用提示：**
-- 输入任何包含数字的内容选择对应测试用例（如"1"、"第2个"、"选3"）
-- 输入 "help" 或 "帮助" 查看此帮助信息
-- 输入具体的提示词进行智能匹配`;
+💡 **Usage Tips:**
+- Enter any content containing numbers to select corresponding test cases (like "1", "2nd one", "select 3")
+- Enter "help" or "?" to view this help information
+- Enter specific prompt words for intelligent matching`;
 
   const helpCase: MockTestCase = {
-    name: "帮助信息",
-    description: "显示所有可用的测试用例",
+    name: "Help Information",
+    description: "Display all available test cases",
     prompt: "help",
     response: helpContent,
     streamChunks: [
-      `# ${model.name} 可用测试用例\n\n`,
+      `# ${model.name} Available Test Cases\n\n`,
       userInputSection,
-      `以下是当前模型支持的测试用例，您可以：\n`,
-      `- 输入包含数字的内容选择对应的测试用例（如"1"、"选择第2个"、"我要3"等）\n`,
-      `- 输入相关关键词进行匹配\n`,
-      `- 直接输入示例提示词\n\n`,
-      `## 可用测试用例：\n\n`,
+      `The following are the test cases supported by the current model. You can:\n`,
+      `- Enter content containing numbers to select corresponding test cases (like "1", "select 2nd", "I want 3", etc.)\n`,
+      `- Enter related keywords for matching\n`,
+      `- Enter example prompts directly\n\n`,
+      `## Available Test Cases:\n\n`,
       caseList,
-      `\n\n---\n\n💡 **使用提示：**\n`,
-      `- 输入任何包含数字的内容选择对应测试用例（如"1"、"第2个"、"选3"）\n`,
-      `- 输入 "help" 或 "帮助" 查看此帮助信息\n`,
-      `- 输入具体的提示词进行智能匹配`
+      `\n\n---\n\n💡 **Usage Tips:**\n`,
+      `- Enter any content containing numbers to select corresponding test cases (like "1", "2nd one", "select 3")\n`,
+      `- Enter "help" or "?" to view this help information\n`,
+      `- Enter specific prompt words for intelligent matching`
     ]
   };
 
-  // 如果是思考模型，添加reasoning_content
+  // If it's a thinking model, add reasoning_content
   if (model.type === 'thinking' || model.type === 'thinking-tag') {
-    const userInputReasoning = userInput ? `用户输入了："${userInput}"。` : '';
-    helpCase.reasoning_content = `${userInputReasoning}用户请求查看帮助信息。我需要为他们展示当前模型${model.name}的所有可用测试用例，包括如何通过数字快速选择的说明。`;
+    const userInputReasoning = userInput ? `User entered: "${userInput}". ` : '';
+    helpCase.reasoning_content = `${userInputReasoning}User requested help information. I need to show them all available test cases for the current model ${model.name}, including instructions on how to quickly select through numbers.`;
     helpCase.reasoning_chunks = [
-      userInput ? `用户输入了："${userInput}"。` : '',
-      "用户请求查看",
-      "帮助信息。",
-      "我需要为他们展示",
-      `当前模型${model.name}`,
-      "的所有可用测试用例，",
-      "包括如何通过数字",
-      "快速选择的说明。"
-    ].filter(chunk => chunk !== ''); // 过滤空字符串
+      userInput ? `User entered: "${userInput}". ` : '',
+      "User requested",
+      " help information.",
+      " I need to show them",
+      ` all available test cases for the current model ${model.name},`,
+      " including instructions",
+      " on how to quickly select",
+      " through numbers."
+    ].filter(chunk => chunk !== ''); // Filter empty strings
   }
 
   return helpCase;
 }
 
 /**
- * 计算 token 数量（简化计算）
+ * Calculate token count (simple estimation)
  */
 export function calculateTokens(text: string): number {
-  // 简化的 token 计算：大约每 4 个字符 = 1 token
   return Math.ceil(text.length / 4);
 }
 
 /**
- * 延迟函数
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    global.setTimeout(resolve, ms);
-  });
-}
-
-/**
- * 随机选择数组中的元素
+ * Randomly select an item from array
  */
 export function randomChoice<T>(array: T[]): T {
   return array[Math.floor(Math.random() * array.length)];
+}
+
+/**
+ * Format error response
+ */
+export function formatErrorResponse(message: string): any {
+  return {
+    error: {
+      message,
+      type: 'invalid_request_error',
+      code: 'invalid_model'
+    }
+  };
 }
 
 /**
@@ -194,15 +197,10 @@ export function supportsStreaming(modelId: string): boolean {
 }
 
 /**
- * 格式化错误响应
+ * 延迟函数
  */
-export function formatErrorResponse(message: string, type: string = 'invalid_request_error') {
-  return {
-    error: {
-      message,
-      type,
-      param: null,
-      code: null
-    }
-  };
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    global.setTimeout(resolve, ms);
+  });
 } 

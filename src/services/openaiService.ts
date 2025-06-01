@@ -21,7 +21,7 @@ import {
 } from '../utils/helpers';
 
 /**
- * 获取模型列表
+ * Get model list
  */
 export function getModels(): ModelsResponse {
   const models: Model[] = mockModels.map(mockModel => ({
@@ -38,51 +38,52 @@ export function getModels(): ModelsResponse {
 }
 
 /**
- * 创建聊天完成（非流式）
+ * Create chat completion (non-streaming)
  */
-export function createChatCompletion(request: ChatCompletionRequest): ChatCompletionResponse | any {
-  // 验证模型
+export function createChatCompletion(request: ChatCompletionRequest): ChatCompletionResponse {
+  // Validate model
   const model = findModelById(request.model);
   if (!model) {
-    return formatErrorResponse(`模型 '${request.model}' 不存在`);
+    return formatErrorResponse(`Model '${request.model}' does not exist`);
   }
 
-  // 获取最后一条用户消息
+  // Get last user message
   const lastUserMessage = request.messages
     .slice()
     .reverse()
     .find(msg => msg.role === 'user');
 
   if (!lastUserMessage) {
-    return formatErrorResponse('未找到用户消息');
+    return formatErrorResponse('No user message found');
   }
 
-  // 选择测试用例
+  // Select test case
   const testCase = selectTestCase(model, lastUserMessage.content);
   
   const id = generateChatCompletionId();
   const timestamp = getCurrentTimestamp();
-  
-  // 构建响应消息
-  let responseContent = testCase.response;
-  
-  // 如果是thinking-tag模型且有reasoning_content，则将其包装在<think>标签中
+
+  // Build response message
+  let content = testCase.response;
+
+  // If it's a thinking-tag model and has reasoning_content, wrap it in <think> tags
   if (model.type === 'thinking-tag' && testCase.reasoning_content) {
-    responseContent = `<think>\n${testCase.reasoning_content}\n</think>\n\n${testCase.response}`;
+    content = `<think>\n${testCase.reasoning_content}\n</think>\n\n${testCase.response}`;
   }
-  
-  const responseMessage: ChatMessage = {
+
+  let responseMessage: ChatMessage = {
     role: 'assistant',
-    content: responseContent
+    content
   };
 
-  // 如果是函数调用模型，添加函数调用（markdown 模型不会执行此逻辑）
+  // If it's a function calling model, add function call (markdown model won't execute this logic)
   if (model.type === 'function' && testCase.functionCall) {
-    responseMessage.function_call = {
-      name: testCase.functionCall.name,
-      arguments: JSON.stringify(testCase.functionCall.arguments)
-    };
+    responseMessage.function_call = testCase.functionCall;
   }
+
+  const promptTokens = calculateTokens(lastUserMessage.content);
+  const completionTokens = calculateTokens(testCase.response);
+  const reasoningTokens = testCase.reasoning_content ? calculateTokens(testCase.reasoning_content) : 0;
 
   const response: ChatCompletionResponse = {
     id,
@@ -92,12 +93,15 @@ export function createChatCompletion(request: ChatCompletionRequest): ChatComple
     choices: [{
       index: 0,
       message: responseMessage,
-      finish_reason: model.type === 'function' && testCase.functionCall ? 'function_call' : 'stop'
+      finish_reason: testCase.functionCall ? 'function_call' : 'stop'
     }],
     usage: {
-      prompt_tokens: calculateTokens(lastUserMessage.content),
-      completion_tokens: calculateTokens(testCase.response),
-      total_tokens: calculateTokens(lastUserMessage.content + testCase.response)
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens + reasoningTokens,
+      completion_tokens_details: {
+        reasoning_tokens: reasoningTokens
+      }
     }
   };
 
@@ -105,30 +109,30 @@ export function createChatCompletion(request: ChatCompletionRequest): ChatComple
 }
 
 /**
- * 创建聊天完成（流式）
+ * Create chat completion (streaming)
  */
 export function* createChatCompletionStream(request: ChatCompletionRequest): Generator<string, void, unknown> {
-  // 验证模型
+  // Validate model
   const model = findModelById(request.model);
   if (!model) {
-    const errorChunk = `data: ${JSON.stringify(formatErrorResponse(`模型 '${request.model}' 不存在`))}\n\n`;
+    const errorChunk = `data: ${JSON.stringify(formatErrorResponse(`Model '${request.model}' does not exist`))}\n\n`;
     yield errorChunk;
     return;
   }
 
-  // 获取最后一条用户消息
+  // Get last user message
   const lastUserMessage = request.messages
     .slice()
     .reverse()
     .find(msg => msg.role === 'user');
 
   if (!lastUserMessage) {
-    const errorChunk = `data: ${JSON.stringify(formatErrorResponse('未找到用户消息'))}\n\n`;
+    const errorChunk = `data: ${JSON.stringify(formatErrorResponse('No user message found'))}\n\n`;
     yield errorChunk;
     return;
   }
 
-  // 选择测试用例
+  // Select test case
   const testCase = selectTestCase(model, lastUserMessage.content);
   
   const id = generateChatCompletionId();
@@ -138,331 +142,11 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
   let completionTokens = 0;
   let reasoningTokens = 0;
 
-  // 思考模式：先输出reasoning_content，再输出content
-  if (model.type === 'thinking' && testCase.reasoning_content) {
-    // 发送第一个chunk - role 和空 reasoning_content
-    const startChunk: ChatCompletionStreamChunk = {
-      id,
-      object: 'chat.completion.chunk',
-      created: timestamp,
-      model: request.model,
-      system_fingerprint: systemFingerprint,
-      choices: [{
-        index: 0,
-        delta: { 
-          role: 'assistant', 
-          content: null,
-          reasoning_content: '' 
-        },
-        logprobs: null,
-        finish_reason: null
-      }],
-      usage: null
-    };
+  if (model.type === 'thinking') {
+    // Thinking mode: output reasoning_content first, then content
     
-    yield `data: ${JSON.stringify(startChunk)}\n\n`;
-
-    // 输出reasoning_content chunks
-    if (testCase.reasoning_chunks && testCase.reasoning_chunks.length > 0) {
-      for (const reasoningChunk of testCase.reasoning_chunks) {
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { 
-              content: null,
-              reasoning_content: reasoningChunk 
-            },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        reasoningTokens += calculateTokens(reasoningChunk);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    }
-
-    // 开始输出content，reasoning_content设为null
-    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
-      for (const chunkContent of testCase.streamChunks) {
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { 
-              content: chunkContent,
-              reasoning_content: null 
-            },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(chunkContent);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    } else {
-      // 否则将完整响应分割成chunks
-      const words = testCase.response.split(' ');
-      for (let i = 0; i < words.length; i += 1) {
-        const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
-        
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { 
-              content: chunkContent,
-              reasoning_content: null 
-            },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(chunkContent);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    }
-  } else if (model.type === 'thinking-tag' && testCase.reasoning_content) {
-    // thinking-tag模式：在content中用<think>标签包围reasoning_content
-    // 发送第一个chunk - role 和空 content
-    const startChunk: ChatCompletionStreamChunk = {
-      id,
-      object: 'chat.completion.chunk',
-      created: timestamp,
-      model: request.model,
-      system_fingerprint: systemFingerprint,
-      choices: [{
-        index: 0,
-        delta: { 
-          role: 'assistant', 
-          content: '' 
-        },
-        logprobs: null,
-        finish_reason: null
-      }],
-      usage: null
-    };
-    
-    yield `data: ${JSON.stringify(startChunk)}\n\n`;
-
-    // 先输出<think>开始标签
-    const thinkStartChunk: ChatCompletionStreamChunk = {
-      id,
-      object: 'chat.completion.chunk',
-      created: timestamp,
-      model: request.model,
-      system_fingerprint: systemFingerprint,
-      choices: [{
-        index: 0,
-        delta: { content: '<think>\n' },
-        logprobs: null,
-        finish_reason: null
-      }],
-      usage: null
-    };
-    
-    completionTokens += calculateTokens('<think>\n');
-    yield `data: ${JSON.stringify(thinkStartChunk)}\n\n`;
-
-    // 输出reasoning_content chunks
-    if (testCase.reasoning_chunks && testCase.reasoning_chunks.length > 0) {
-      for (const reasoningChunk of testCase.reasoning_chunks) {
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { content: reasoningChunk },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(reasoningChunk);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    } else {
-      // 输出完整的reasoning_content
-      const reasoningChunk: ChatCompletionStreamChunk = {
-        id,
-        object: 'chat.completion.chunk',
-        created: timestamp,
-        model: request.model,
-        system_fingerprint: systemFingerprint,
-        choices: [{
-          index: 0,
-          delta: { content: testCase.reasoning_content },
-          logprobs: null,
-          finish_reason: null
-        }],
-        usage: null
-      };
-      
-      completionTokens += calculateTokens(testCase.reasoning_content);
-      yield `data: ${JSON.stringify(reasoningChunk)}\n\n`;
-    }
-
-    // 输出</think>结束标签和换行
-    const thinkEndChunk: ChatCompletionStreamChunk = {
-      id,
-      object: 'chat.completion.chunk',
-      created: timestamp,
-      model: request.model,
-      system_fingerprint: systemFingerprint,
-      choices: [{
-        index: 0,
-        delta: { content: '\n</think>\n\n' },
-        logprobs: null,
-        finish_reason: null
-      }],
-      usage: null
-    };
-    
-    completionTokens += calculateTokens('\n</think>\n\n');
-    yield `data: ${JSON.stringify(thinkEndChunk)}\n\n`;
-
-    // 输出正常的response content
-    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
-      for (const chunkContent of testCase.streamChunks) {
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { content: chunkContent },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(chunkContent);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    } else {
-      // 否则将完整响应分割成chunks
-      const words = testCase.response.split(' ');
-      for (let i = 0; i < words.length; i += 1) {
-        const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
-        
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { content: chunkContent },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(chunkContent);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    }
-  } else {
-    // 非思考模式：正常输出
-    // 发送第一个chunk - role 和空 content
-    const startChunk: ChatCompletionStreamChunk = {
-      id,
-      object: 'chat.completion.chunk',
-      created: timestamp,
-      model: request.model,
-      system_fingerprint: systemFingerprint,
-      choices: [{
-        index: 0,
-        delta: { 
-          role: 'assistant', 
-          content: '' 
-        },
-        logprobs: null,
-        finish_reason: null
-      }],
-      usage: null
-    };
-    
-    yield `data: ${JSON.stringify(startChunk)}\n\n`;
-
-    // 如果有预定义的流式chunk，使用它们
-    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
-      for (const chunkContent of testCase.streamChunks) {
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { content: chunkContent },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(chunkContent);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    } else {
-      // 否则将完整响应分割成chunks
-      const words = testCase.response.split(' ');
-      for (let i = 0; i < words.length; i += 1) {
-        const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
-        
-        const chunk: ChatCompletionStreamChunk = {
-          id,
-          object: 'chat.completion.chunk',
-          created: timestamp,
-          model: request.model,
-          system_fingerprint: systemFingerprint,
-          choices: [{
-            index: 0,
-            delta: { content: chunkContent },
-            logprobs: null,
-            finish_reason: null
-          }],
-          usage: null
-        };
-        
-        completionTokens += calculateTokens(chunkContent);
-        yield `data: ${JSON.stringify(chunk)}\n\n`;
-      }
-    }
-  }
-
-  // 处理函数调用（仅限 function 类型模型，markdown 模型不会执行此逻辑）
-  if (model.type === 'function' && testCase.functionCall) {
-    const functionChunk: ChatCompletionStreamChunk = {
+    // Send first chunk - role and empty reasoning_content
+    const firstChunk: ChatCompletionStreamChunk = {
       id,
       object: 'chat.completion.chunk',
       created: timestamp,
@@ -471,26 +155,328 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
       choices: [{
         index: 0,
         delta: {
-          function_call: {
-            name: testCase.functionCall.name,
-            arguments: JSON.stringify(testCase.functionCall.arguments)
-          }
+          role: 'assistant',
+          content: null,
+          reasoning: testCase.reasoning_content || ''
         },
-        logprobs: null,
         finish_reason: null
-      }],
-      usage: null
+      }]
     };
-    
-    yield `data: ${JSON.stringify(functionChunk)}\n\n`;
+    yield `data: ${JSON.stringify(firstChunk)}\n\n`;
+
+    // Output reasoning_content chunks
+    if (testCase.reasoning_content && testCase.reasoning_chunks) {
+      for (const chunk of testCase.reasoning_chunks) {
+        const reasoningChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              reasoning: chunk
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(reasoningChunk)}\n\n`;
+        reasoningTokens += calculateTokens(chunk);
+      }
+    }
+
+    // Start outputting content, set reasoning_content to null
+    const contentStartChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: {
+          reasoning: null,
+          content: ''
+        },
+        finish_reason: null
+      }]
+    };
+    yield `data: ${JSON.stringify(contentStartChunk)}\n\n`;
+
+    // Use predefined stream chunks if available
+    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
+      for (const chunk of testCase.streamChunks) {
+        const streamChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunk
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(streamChunk)}\n\n`;
+        completionTokens += calculateTokens(chunk);
+      }
+    } else {
+      // Otherwise split the complete response into chunks
+      const words = testCase.response.split(' ');
+      for (let i = 0; i < words.length; i += 2) {
+        const chunkText = words.slice(i, i + 2).join(' ') + (i + 2 < words.length ? ' ' : '');
+        const streamChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunkText
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(streamChunk)}\n\n`;
+        completionTokens += calculateTokens(chunkText);
+      }
+    }
+
+  } else if (model.type === 'thinking-tag') {
+    // thinking-tag mode: surround reasoning_content with <think> tags in content
+    // Send first chunk - role and empty content
+    const firstChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: {
+          role: 'assistant',
+          content: ''
+        },
+        finish_reason: null
+      }]
+    };
+    yield `data: ${JSON.stringify(firstChunk)}\n\n`;
+
+    if (testCase.reasoning_content) {
+      // First output <think> start tag
+      const thinkStartChunk: ChatCompletionStreamChunk = {
+        id,
+        object: 'chat.completion.chunk',
+        created: timestamp,
+        model: request.model,
+        system_fingerprint: systemFingerprint,
+        choices: [{
+          index: 0,
+          delta: {
+            content: '<think>\n'
+          },
+          finish_reason: null
+        }]
+      };
+      yield `data: ${JSON.stringify(thinkStartChunk)}\n\n`;
+
+      // Output reasoning_content chunks
+      if (testCase.reasoning_chunks && testCase.reasoning_chunks.length > 0) {
+        for (const chunk of testCase.reasoning_chunks) {
+          const reasoningChunk: ChatCompletionStreamChunk = {
+            id,
+            object: 'chat.completion.chunk',
+            created: timestamp,
+            model: request.model,
+            system_fingerprint: systemFingerprint,
+            choices: [{
+              index: 0,
+              delta: {
+                content: chunk
+              },
+              finish_reason: null
+            }]
+          };
+          yield `data: ${JSON.stringify(reasoningChunk)}\n\n`;
+          reasoningTokens += calculateTokens(chunk);
+        }
+      } else {
+        // Output complete reasoning_content
+        const reasoningChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: testCase.reasoning_content
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(reasoningChunk)}\n\n`;
+        reasoningTokens += calculateTokens(testCase.reasoning_content);
+      }
+
+      // Output </think> end tag and newline
+      const thinkEndChunk: ChatCompletionStreamChunk = {
+        id,
+        object: 'chat.completion.chunk',
+        created: timestamp,
+        model: request.model,
+        system_fingerprint: systemFingerprint,
+        choices: [{
+          index: 0,
+          delta: {
+            content: '\n</think>\n\n'
+          },
+          finish_reason: null
+        }]
+      };
+      yield `data: ${JSON.stringify(thinkEndChunk)}\n\n`;
+    }
+
+    // Output normal response content
+    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
+      for (const chunk of testCase.streamChunks) {
+        const streamChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunk
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(streamChunk)}\n\n`;
+        completionTokens += calculateTokens(chunk);
+      }
+    } else {
+      // Otherwise split the complete response into chunks
+      const words = testCase.response.split(' ');
+      for (let i = 0; i < words.length; i += 2) {
+        const chunkText = words.slice(i, i + 2).join(' ') + (i + 2 < words.length ? ' ' : '');
+        const streamChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunkText
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(streamChunk)}\n\n`;
+        completionTokens += calculateTokens(chunkText);
+      }
+    }
+
+  } else {
+    // Non-thinking mode: normal output
+    // Send first chunk - role and empty content
+    const firstChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: {
+          role: 'assistant',
+          content: ''
+        },
+        finish_reason: null
+      }]
+    };
+    yield `data: ${JSON.stringify(firstChunk)}\n\n`;
+
+    // If there are predefined streaming chunks, use them
+    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
+      for (const chunk of testCase.streamChunks) {
+        const streamChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunk
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(streamChunk)}\n\n`;
+        completionTokens += calculateTokens(chunk);
+      }
+    } else {
+      // Otherwise split the complete response into chunks
+      const words = testCase.response.split(' ');
+      for (let i = 0; i < words.length; i += 2) {
+        const chunkText = words.slice(i, i + 2).join(' ') + (i + 2 < words.length ? ' ' : '');
+        const streamChunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunkText
+            },
+            finish_reason: null
+          }]
+        };
+        yield `data: ${JSON.stringify(streamChunk)}\n\n`;
+        completionTokens += calculateTokens(chunkText);
+      }
+    }
+
+    // Handle function calls (only for function type models, markdown models won't execute this logic)
+    if (model.type === 'function' && testCase.functionCall) {
+      const functionCallChunk: ChatCompletionStreamChunk = {
+        id,
+        object: 'chat.completion.chunk',
+        created: timestamp,
+        model: request.model,
+        system_fingerprint: systemFingerprint,
+        choices: [{
+          index: 0,
+          delta: {
+            function_call: testCase.functionCall
+          },
+          finish_reason: null
+        }]
+      };
+      yield `data: ${JSON.stringify(functionCallChunk)}\n\n`;
+    }
   }
 
-  // 计算 token 使用量
+  // Calculate token usage
   const promptTokens = calculateTokens(lastUserMessage.content);
-  const totalTokens = promptTokens + completionTokens + reasoningTokens;
 
-  // 发送最后一个chunk - 包含 finish_reason 和 usage
-  const endChunk: ChatCompletionStreamChunk = {
+  // Send last chunk - contains finish_reason and usage
+  const lastChunk: ChatCompletionStreamChunk = {
     id,
     object: 'chat.completion.chunk',
     created: timestamp,
@@ -498,45 +484,37 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
     system_fingerprint: systemFingerprint,
     choices: [{
       index: 0,
-      delta: { 
-        content: '',
-        reasoning_content: null 
-      },
-      logprobs: null,
-      finish_reason: model.type === 'function' && testCase.functionCall ? 'function_call' : 'stop'
+      delta: {},
+      finish_reason: (model.type === 'function' && testCase.functionCall) ? 'function_call' : 'stop'
     }],
     usage: {
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
-      total_tokens: totalTokens,
-      prompt_tokens_details: {
-        cached_tokens: 0
-      },
+      total_tokens: promptTokens + completionTokens + reasoningTokens,
       completion_tokens_details: {
         reasoning_tokens: reasoningTokens
-      },
-      prompt_cache_hit_tokens: 0,
-      prompt_cache_miss_tokens: promptTokens
+      }
     }
   };
-  
-  yield `data: ${JSON.stringify(endChunk)}\n\n`;
+  yield `data: ${JSON.stringify(lastChunk)}\n\n`;
+
+  // Send end marker
   yield `data: [DONE]\n\n`;
 }
 
 /**
- * 生成图像
+ * Generate image
  */
 export function generateImage(request: ImageGenerationRequest): ImageGenerationResponse {
   const n = request.n || 1;
   const timestamp = getCurrentTimestamp();
   const size = request.size || '1024x1024';
   
-  // 根据模型选择不同的图片
+  // Choose different images based on model
   const model = request.model || 'gpt-4o-image';
   let imageUrls = mockImageUrls;
   
-  // 如果指定了 gpt-4o-image 模型，使用更高质量的占位图
+  // If gpt-4o-image model is specified, use higher quality placeholder images
   if (model === 'gpt-4o-image') {
     imageUrls = [
       `https://via.placeholder.com/${size}/FF6B6B/FFFFFF?text=GPT-4O+Image+1`,
@@ -554,7 +532,7 @@ export function generateImage(request: ImageGenerationRequest): ImageGenerationR
     const imageUrl = randomChoice(imageUrls);
     
     if (request.response_format === 'b64_json') {
-      // 模拟 base64 编码的图像（实际应用中这里会是真实的 base64）
+      // Simulate base64 encoded image (in actual applications this would be real base64)
       return {
         b64_json: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
       };

@@ -1,132 +1,132 @@
 import { MockModel, MockTestCase } from '../types';
 
-// 思考型模型的测试用例
+// Thinking model test cases
 const thinkingTestCases: MockTestCase[] = [
   {
-    name: "数学问题",
-    description: "解决复杂数学问题",
-    prompt: "计算 2+2",
-    reasoning_content: "这是一个简单的加法问题。我需要计算 2 + 2。2 + 2 = 4。这是基础的算术运算。",
+    name: "Math Problem",
+    description: "Solve complex math problems",
+    prompt: "Calculate 2+2",
+    reasoning_content: "This is a simple addition problem. I need to calculate 2 + 2. 2 + 2 = 4. This is basic arithmetic.",
     reasoning_chunks: [
-      "这是一个简单的",
-      "加法问题。",
-      "我需要计算",
-      " 2 + 2。",
-      "2 + 2 = 4。",
-      "这是基础的",
-      "算术运算。"
+      "This is a simple",
+      " addition problem.",
+      " I need to calculate",
+      " 2 + 2.",
+      " 2 + 2 = 4.",
+      " This is basic",
+      " arithmetic."
     ],
-    response: "2 + 2 = 4\n\n这是一个基础的加法运算。",
+    response: "2 + 2 = 4\n\nThis is a basic addition operation.",
     streamChunks: [
       "2 + 2 = 4",
-      "\n\n这是一个",
-      "基础的",
-      "加法运算。"
+      "\n\nThis is a",
+      " basic",
+      " addition operation."
     ]
   },
   {
-    name: "编程问题",
-    description: "代码问题解答",
-    prompt: "如何用 Python 创建一个列表？",
-    reasoning_content: "用户询问如何用 Python 创建列表。这是一个基础的 Python 问题。Python 中创建列表有几种方式：1. 使用方括号 [] 2. 使用 list() 构造函数 3. 使用列表推导式。我应该提供清晰的例子。",
+    name: "Programming Question",
+    description: "Code problem solving",
+    prompt: "How to create a list in Python?",
+    reasoning_content: "The user is asking how to create a list in Python. This is a basic Python question. There are several ways to create lists in Python: 1. Using square brackets [] 2. Using the list() constructor 3. Using list comprehension. I should provide clear examples.",
     reasoning_chunks: [
-      "用户询问如何用",
-      " Python 创建列表。",
-      "这是一个基础的",
-      " Python 问题。",
-      "Python 中创建列表",
-      "有几种方式：",
-      "1. 使用方括号 []",
-      " 2. 使用 list()",
-      " 构造函数",
-      " 3. 使用列表推导式。",
-      "我应该提供",
-      "清晰的例子。"
+      "The user is asking how to",
+      " create a list in Python.",
+      " This is a basic",
+      " Python question.",
+      " There are several ways",
+      " to create lists:",
+      " 1. Using square brackets []",
+      " 2. Using the list()",
+      " constructor",
+      " 3. Using list comprehension.",
+      " I should provide",
+      " clear examples."
     ],
-    response: `在 Python 中创建列表有几种方式：
+    response: `There are several ways to create lists in Python:
 
-1. **空列表**：
+1. **Empty list**:
    \`\`\`python
    my_list = []
    \`\`\`
 
-2. **带初始值的列表**：
+2. **List with initial values**:
    \`\`\`python
    my_list = [1, 2, 3, 4, 5]
    \`\`\`
 
-3. **使用 list() 构造函数**：
+3. **Using list() constructor**:
    \`\`\`python
    my_list = list()
    \`\`\`
 
-4. **列表推导式**：
+4. **List comprehension**:
    \`\`\`python
    my_list = [x for x in range(10)]
    \`\`\``,
     streamChunks: [
-      "在 Python 中创建列表",
-      "有几种方式：\n\n",
-      "1. **空列表**：\n   ```python\n",
+      "There are several ways to create lists",
+      " in Python:\n\n",
+      "1. **Empty list**:\n   ```python\n",
       "   my_list = []\n   ```\n\n",
-      "2. **带初始值的列表**：\n",
+      "2. **List with initial values**:\n",
       "   ```python\n   my_list = [1, 2, 3, 4, 5]\n",
-      "   ```\n\n3. **使用 list() 构造函数**：\n",
+      "   ```\n\n3. **Using list() constructor**:\n",
       "   ```python\n   my_list = list()\n",
-      "   ```\n\n4. **列表推导式**：\n",
+      "   ```\n\n4. **List comprehension**:\n",
       "   ```python\n   my_list = [x for x in range(10)]\n",
       "   ```"
     ]
   },
   {
-    name: "默认回复",
-    description: "通用友好回复",
-    prompt: "你好",
-    reasoning_content: "我们正在与用户进行对话，用户刚刚说：\"你好\"。根据对话历史，我们需要给出一个友好的回应。由于用户只是打招呼，我们不需要调用任何函数，直接回复即可。",
+    name: "Default Reply",
+    description: "General friendly response",
+    prompt: "Hello",
+    reasoning_content: "We are having a conversation with the user, and the user just said: \"Hello\". Based on the conversation history, we need to give a friendly response. Since the user is just greeting, we don't need to call any functions, we can reply directly.",
     reasoning_chunks: [
-      "我们正在与",
-      "用户进行对话，",
-      "用户刚刚说：",
-      "\"你好\"。",
-      "根据对话历史，",
-      "我们需要给出",
-      "一个友好的回应。",
-      "由于用户只是",
-      "打招呼，我们",
-      "不需要调用任何",
-      "函数，直接回复",
-      "即可。"
+      "We are having a",
+      " conversation with the user,",
+      " and the user just said:",
+      " \"Hello\".",
+      " Based on the conversation history,",
+      " we need to give",
+      " a friendly response.",
+      " Since the user is just",
+      " greeting, we don't",
+      " need to call any",
+      " functions, we can reply",
+      " directly."
     ],
-    response: "你好！有什么可以帮您的吗？ 😊",
+    response: "Hello! How can I help you today? 😊",
     streamChunks: [
-      "你好！",
-      "有什么可以",
-      "帮您的吗？",
+      "Hello!",
+      " How can I",
+      " help you today?",
       " 😊"
     ]
   }
 ];
 
-// Function Call 模型的测试用例
+// Function Call model test cases
 const functionTestCases: MockTestCase[] = [
   {
-    name: "天气查询",
-    description: "查询天气信息",
-    prompt: "今天北京的天气怎么样？",
-    response: "我来为您查询北京今天的天气情况。",
+    name: "Weather Query",
+    description: "Query weather information",
+    prompt: "What's the weather like in Beijing today?",
+    response: "Let me check the weather in Beijing for you today.",
     functionCall: {
       name: "get_weather",
       arguments: {
-        location: "北京",
+        location: "Beijing",
         date: "today"
       }
     }
   },
   {
-    name: "计算器",
-    description: "执行数学计算",
-    prompt: "帮我计算 15 * 23",
-    response: "我来为您计算 15 乘以 23 的结果。",
+    name: "Calculator",
+    description: "Perform mathematical calculations",
+    prompt: "Help me calculate 15 * 23",
+    response: "Let me calculate 15 multiplied by 23 for you.",
     functionCall: {
       name: "calculate",
       arguments: {
@@ -137,10 +137,10 @@ const functionTestCases: MockTestCase[] = [
     }
   },
   {
-    name: "时间查询",
-    description: "查询当前时间",
-    prompt: "现在几点了？",
-    response: "让我为您查询当前时间。",
+    name: "Time Query",
+    description: "Query current time",
+    prompt: "What time is it now?",
+    response: "Let me check the current time for you.",
     functionCall: {
       name: "get_time",
       arguments: {
@@ -150,91 +150,91 @@ const functionTestCases: MockTestCase[] = [
   }
 ];
 
-// Markdown 示例模型的测试用例
+// Markdown sample model test cases
 const markdownTestCases: MockTestCase[] = [
   {
-    name: "完整文档示例",
-    description: "标准的 Markdown 文档格式",
-    prompt: "任何问题",
+    name: "Complete Document Example",
+    description: "Standard Markdown document format",
+    prompt: "Any question",
     response: `
-# Markdown 样式全功能演示
+# Complete Markdown Style Demonstration
 
-本文档全面展示 Markdown 的所有基础语法，涵盖标题、段落、列表、链接、图片、代码块、表格、引用等常见元素，并包含特殊符号和扩展功能的使用示例。
-
----
-
-## 1. 标题层级（1-6级）
-
-# 一级标题（H1）
-## 二级标题（H2）
-### 三级标题（H3）
-#### 四级标题（H4）
-##### 五级标题（H5）
-###### 六级标题（H6）
+This document comprehensively demonstrates all basic Markdown syntax, covering titles, paragraphs, lists, links, images, code blocks, tables, quotes and other common elements, along with usage examples of special symbols and extended features.
 
 ---
 
-## 2. 文本格式化
+## 1. Title Hierarchy (Levels 1-6)
 
-**加粗**  
-*斜体*  
-***加粗斜体***  
-~~删除线~~  
-\`内联代码\`  
-^上标^  
-~下标~  
-**_混合样式_**  
+# Level 1 Title (H1)
+## Level 2 Title (H2)
+### Level 3 Title (H3)
+#### Level 4 Title (H4)
+##### Level 5 Title (H5)
+###### Level 6 Title (H6)
 
 ---
 
-## 3. 列表结构
+## 2. Text Formatting
 
-### 无序列表
-- 项目1
-- 项目2
-  - 子项目A
-  - 子项目B
-- 项目3
-
-### 有序列表
-1. 第一项
-2. 第二项
-   1. 子项1
-   2. 子项2
-3. 第三项
-
-### 任务列表
-- [x] 完成需求分析
-- [ ] 编写文档
-- [ ] 代码审查
+**Bold**  
+*Italic*  
+***Bold Italic***  
+~~Strikethrough~~  
+\`Inline code\`  
+^Superscript^  
+~Subscript~  
+**_Mixed styles_**  
 
 ---
 
-## 4. 链接与图片
+## 3. List Structures
 
-### 链接
-[百度搜索](https://www.baidu.com "百度搜索")
-[GitHub](https://github.com "GitHub官网")
+### Unordered List
+- Item 1
+- Item 2
+  - Sub-item A
+  - Sub-item B
+- Item 3
 
-### 图片
-![示例图片](https://via.placeholder.com/150 "占位图片")
-![带标题的图片](https://via.placeholder.com/300x100 "自定义尺寸图片")
+### Ordered List
+1. First item
+2. Second item
+   1. Sub-item 1
+   2. Sub-item 2
+3. Third item
+
+### Task List
+- [x] Complete requirements analysis
+- [ ] Write documentation
+- [ ] Code review
 
 ---
 
-## 5. 代码块
+## 4. Links and Images
 
-### 内联代码
-使用 \`console.log("Hello")\` 进行调试。
+### Links
+[Google Search](https://www.google.com "Google Search")
+[GitHub](https://github.com "GitHub Website")
 
-### 代码块
+### Images
+![Sample Image](https://via.placeholder.com/150 "Placeholder Image")
+![Image with Title](https://via.placeholder.com/300x100 "Custom Size Image")
+
+---
+
+## 5. Code Blocks
+
+### Inline Code
+Use \`console.log("Hello")\` for debugging.
+
+### Code Blocks
 \`\`\`python
 def hello():
     print("Hello World!")
 \`\`\`
 
 \`\`\`javascript
-console.log("JavaScript 示例");
+console.log("JavaScript Example");
 \`\`\`
 
 \`\`\`json
@@ -246,33 +246,33 @@ console.log("JavaScript 示例");
 
 ---
 
-## 6. 表格
+## 6. Tables
 
-| 姓名     | 年龄 | 城市       | 备注           |
-|----------|------|------------|----------------|
-| 张三     | 28   | 北京       | 主任           |
-| 李四     | 32   | 上海       | 工程师         |
-| 王五     | 25   | 广州       | 实习生         |
+| Name     | Age | City       | Notes          |
+|----------|-----|------------|----------------|
+| John     | 28  | New York   | Manager        |
+| Jane     | 32  | Los Angeles| Engineer       |
+| Bob      | 25  | Chicago    | Intern         |
 
-**对齐方式：**
-| 左对齐 | 居中对齐 | 右对齐 |
-|:------|:------:|------:|
-| 1     | 2      | 3     |
-
----
-
-## 7. 引用块
-
-> 这是一个普通引用块  
-> 支持多行文本
-
-> ## 嵌套引用
-> > 二级引用块  
-> > > 三级引用块
+**Alignment Options:**
+| Left Align | Center Align | Right Align |
+|:-----------|:------------:|------------:|
+| 1          | 2            | 3           |
 
 ---
 
-## 8. 分隔线
+## 7. Quote Blocks
+
+> This is a normal quote block  
+> Supports multiple lines of text
+
+> ## Nested Quotes
+> > Second level quote block  
+> > > Third level quote block
+
+---
+
+## 8. Dividers
 
 ---
 ***  
@@ -282,132 +282,132 @@ ___
 
 ---
 
-## 9. 数学公式（LaTeX）
+## 9. Mathematical Formulas (LaTeX)
 
-行内公式：$E = mc^2$  
-独立公式：
+Inline formula: $E = mc^2$  
+Standalone formula:
 $$
 \\int_{0}^{1} x^2 dx = \\frac{1}{3}
 $$
 
 ---
 
-## 10. 脚注
+## 10. Footnotes
 
-这是一个脚注示例[^1].
+This is a footnote example[^1].
 
-[^1]: 脚注内容可以包含任意文本，支持多行  
-  以及格式化内容。
+[^1]: Footnote content can contain arbitrary text, supports multiple lines  
+  as well as formatted content.
 
 ---
 
-## 11. 自定义样式（HTML）
+## 11. Custom Styles (HTML)
 
 <div style="background: #f0f0f0; padding: 10px; border-left: 5px solid #333;">
-  <strong>提示：</strong> 这是一个自定义 HTML 样式块。
+  <strong>Tip:</strong> This is a custom HTML style block.
 </div>
 
-<mark style="background-color: #ffff00;">高亮文本</mark>
+<mark style="background-color: #ffff00;">Highlighted text</mark>
 
 ---
 
-## 12. 其他特殊符号
+## 12. Other Special Symbols
 
-- 水平线：\`---\`
-- 特殊字符：&lt; &gt; &amp; &quot; &apos;
-- 逃逸符号：\\*不加粗\\*  
-- 注释（仅源码中有效）：<!-- 这是注释 -->
+- Horizontal line: \`---\`
+- Special characters: &lt; &gt; &amp; &quot; &apos;
+- Escape symbols: \\*not bold\\*  
+- Comments (only effective in source code): <!-- This is a comment -->
 
 ---
 
-通过以上示例，您可以全面了解 Markdown 的基本语法和样式应用。实际使用中可根据需要组合不同元素，创建结构清晰、格式美观的文档内容。`,
+Through the above examples, you can comprehensively understand the basic syntax and style applications of Markdown. In actual use, you can combine different elements as needed to create documents with clear structure and beautiful formatting.`,
     streamChunks: [
-      "# Markdown 样式全功能演示\n\n",
-      "本文档全面展示 Markdown 的所有基础语法，涵盖标题、段落、列表、链接、图片、代码块、表格、引用等常见元素，",
-      "并包含特殊符号和扩展功能的使用示例。\n\n---\n\n## 1. 标题层级（1-6级）\n\n",
-      "# 一级标题（H1）\n## 二级标题（H2）\n### 三级标题（H3）\n#### 四级标题（H4）\n",
-      "##### 五级标题（H5）\n###### 六级标题（H6）\n\n---\n\n## 2. 文本格式化\n\n",
-      "**加粗**  \n*斜体*  \n***加粗斜体***  \n~~删除线~~  \n`内联代码`  \n",
-      "^上标^  \n~下标~  \n**_混合样式_**  \n\n---\n\n## 3. 列表结构\n\n",
-      "### 无序列表\n- 项目1\n- 项目2\n  - 子项目A\n  - 子项目B\n- 项目3\n\n",
-      "### 有序列表\n1. 第一项\n2. 第二项\n   1. 子项1\n   2. 子项2\n3. 第三项\n\n",
-      "### 任务列表\n- [x] 完成需求分析\n- [ ] 编写文档\n- [ ] 代码审查\n\n---\n\n",
-      "## 4. 链接与图片\n\n### 链接\n[百度搜索](https://www.baidu.com \"百度搜索\")\n",
-      "[GitHub](https://github.com \"GitHub官网\")\n\n### 图片\n",
-      "![示例图片](https://via.placeholder.com/150 \"占位图片\")\n",
-      "![带标题的图片](https://via.placeholder.com/300x100 \"自定义尺寸图片\")\n\n---\n\n",
-      "## 5. 代码块\n\n### 内联代码\n使用 `console.log(\"Hello\")` 进行调试。\n\n",
-      "### 代码块\n```python\ndef hello():\n    print(\"Hello World!\")\n```\n\n",
-      "```javascript\nconsole.log(\"JavaScript 示例\");\n```\n\n",
+      "# Complete Markdown Style Demonstration\n\n",
+      "This document comprehensively demonstrates all basic Markdown syntax, covering titles, paragraphs, lists, links, images, code blocks, tables, quotes and other common elements,",
+      " along with usage examples of special symbols and extended features.\n\n---\n\n## 1. Title Hierarchy (Levels 1-6)\n\n",
+      "# Level 1 Title (H1)\n## Level 2 Title (H2)\n### Level 3 Title (H3)\n#### Level 4 Title (H4)\n",
+      "##### Level 5 Title (H5)\n###### Level 6 Title (H6)\n\n---\n\n## 2. Text Formatting\n\n",
+      "**Bold**  \n*Italic*  \n***Bold Italic***  \n~~Strikethrough~~  \n`Inline code`  \n",
+      "^Superscript^  \n~Subscript~  \n**_Mixed styles_**  \n\n---\n\n## 3. List Structures\n\n",
+      "### Unordered List\n- Item 1\n- Item 2\n  - Sub-item A\n  - Sub-item B\n- Item 3\n\n",
+      "### Ordered List\n1. First item\n2. Second item\n   1. Sub-item 1\n   2. Sub-item 2\n3. Third item\n\n",
+      "### Task List\n- [x] Complete requirements analysis\n- [ ] Write documentation\n- [ ] Code review\n\n---\n\n",
+      "## 4. Links and Images\n\n### Links\n[Google Search](https://www.google.com \"Google Search\")\n",
+      "[GitHub](https://github.com \"GitHub Website\")\n\n### Images\n",
+      "![Sample Image](https://via.placeholder.com/150 \"Placeholder Image\")\n",
+      "![Image with Title](https://via.placeholder.com/300x100 \"Custom Size Image\")\n\n---\n\n",
+      "## 5. Code Blocks\n\n### Inline Code\nUse `console.log(\"Hello\")` for debugging.\n\n",
+      "### Code Blocks\n```python\ndef hello():\n    print(\"Hello World!\")\n```\n\n",
+      "```javascript\nconsole.log(\"JavaScript Example\");\n```\n\n",
       "```json\n{\n  \"name\": \"Markdown\",\n  \"version\": \"1.0\"\n}\n```\n\n---\n\n",
-      "## 6. 表格\n\n| 姓名     | 年龄 | 城市       | 备注           |\n",
-      "|----------|------|------------|----------------|\n",
-      "| 张三     | 28   | 北京       | 主任           |\n| 李四     | 32   | 上海       | 工程师         |\n",
-      "| 王五     | 25   | 广州       | 实习生         |\n\n**对齐方式：**\n",
-      "| 左对齐 | 居中对齐 | 右对齐 |\n|:------|:------:|------:|\n| 1     | 2      | 3     |\n\n",
-      "---\n\n## 7. 引用块\n\n> 这是一个普通引用块  \n> 支持多行文本\n\n",
-      "> ## 嵌套引用\n> > 二级引用块  \n> > > 三级引用块\n\n---\n\n",
-      "## 8. 分隔线\n\n---\n***  \n___  \n- - -  \n***  \n\n---\n\n",
-      "## 9. 数学公式（LaTeX）\n\n行内公式：$E = mc^2$  \n独立公式：\n",
+      "## 6. Tables\n\n| Name     | Age | City       | Notes          |\n",
+      "|----------|-----|------------|----------------|\n",
+      "| John     | 28  | New York   | Manager        |\n| Jane     | 32  | Los Angeles| Engineer       |\n",
+      "| Bob      | 25  | Chicago    | Intern         |\n\n**Alignment Options:**\n",
+      "| Left Align | Center Align | Right Align |\n|:-----------|:------------:|------------:|\n| 1          | 2            | 3           |\n\n",
+      "---\n\n## 7. Quote Blocks\n\n> This is a normal quote block  \n> Supports multiple lines of text\n\n",
+      "> ## Nested Quotes\n> > Second level quote block  \n> > > Third level quote block\n\n---\n\n",
+      "## 8. Dividers\n\n---\n***  \n___  \n- - -  \n***  \n\n---\n\n",
+      "## 9. Mathematical Formulas (LaTeX)\n\nInline formula: $E = mc^2$  \nStandalone formula:\n",
       "$$\n\\int_{0}^{1} x^2 dx = \\frac{1}{3}\n$$\n\n---\n\n",
-      "## 10. 脚注\n\n这是一个脚注示例[^1].\n\n[^1]: 脚注内容可以包含任意文本，支持多行  \n",
-      "  以及格式化内容。\n\n---\n\n## 11. 自定义样式（HTML）\n\n",
+      "## 10. Footnotes\n\nThis is a footnote example[^1].\n\n[^1]: Footnote content can contain arbitrary text, supports multiple lines  \n",
+      "  as well as formatted content.\n\n---\n\n## 11. Custom Styles (HTML)\n\n",
       "<div style=\"background: #f0f0f0; padding: 10px; border-left: 5px solid #333;\">\n",
-      "  <strong>提示：</strong> 这是一个自定义 HTML 样式块。\n</div>\n\n",
-      "<mark style=\"background-color: #ffff00;\">高亮文本</mark>\n\n---\n\n",
-      "## 12. 其他特殊符号\n\n- 水平线：`---`\n- 特殊字符：&lt; &gt; &amp; &quot; &apos;\n",
-      "- 逃逸符号：\\*不加粗\\*  \n- 注释（仅源码中有效）：<!-- 这是注释 -->\n\n---\n\n",
-      "通过以上示例，您可以全面了解 Markdown 的基本语法和样式应用。",
-      "实际使用中可根据需要组合不同元素，创建结构清晰、格式美观的文档内容。"
+      "  <strong>Tip:</strong> This is a custom HTML style block.\n</div>\n\n",
+      "<mark style=\"background-color: #ffff00;\">Highlighted text</mark>\n\n---\n\n",
+      "## 12. Other Special Symbols\n\n- Horizontal line: `---`\n- Special characters: &lt; &gt; &amp; &quot; &apos;\n",
+      "- Escape symbols: \\*not bold\\*  \n- Comments (only effective in source code): <!-- This is a comment -->\n\n---\n\n",
+      "Through the above examples, you can comprehensively understand the basic syntax and style applications of Markdown.",
+      " In actual use, you can combine different elements as needed to create documents with clear structure and beautiful formatting."
     ]
   }
 ];
 
-// 预定义的模型列表
+// Predefined model list
 export const mockModels: MockModel[] = [
   {
     id: "mock-gpt-thinking",
-    name: "Mock GPT 思考模式",
-    description: "支持显示思考过程的模型，适合调试推理逻辑",
+    name: "Mock GPT Thinking Mode",
+    description: "Model that supports displaying thinking process, suitable for debugging reasoning logic",
     type: "thinking",
     testCases: thinkingTestCases
   },
   {
     id: "mock-gpt-thinking-tag",
-    name: "Mock GPT 思考标签模式",
-    description: "支持在content中用<think>标签显示思考过程的模型",
+    name: "Mock GPT Thinking Tag Mode",
+    description: "Model that supports displaying thinking process using <think> tags in content",
     type: "thinking-tag",
     testCases: thinkingTestCases
   },
   {
     id: "mock-gpt-function",
-    name: "Mock GPT 函数调用",
-    description: "支持函数调用的模型，适合测试工具集成",
+    name: "Mock GPT Function Calling",
+    description: "Model that supports function calling, suitable for testing tool integration",
     type: "function",
     testCases: functionTestCases
   },
   {
     id: "mock-gpt-markdown",
-    name: "Mock GPT Markdown 示例",
-    description: "专门输出标准 Markdown 格式的纯文本模型，不支持函数调用，专注于内容展示和 UI 调试",
+    name: "Mock GPT Markdown Sample",
+    description: "Pure text model specialized in outputting standard Markdown format, does not support function calling, focuses on content display and UI debugging",
     type: "markdown",
     testCases: markdownTestCases
   },
   {
     id: "gpt-4o-image",
-    name: "GPT-4O 图像生成",
-    description: "专门用于图像生成的模型，支持多种尺寸和风格",
+    name: "GPT-4O Image Generation",
+    description: "Model specialized for image generation, supports various sizes and styles",
     type: "image",
     testCases: [{
-      name: "图像生成示例",
-      description: "生成高质量图像",
-      prompt: "任何图像描述",
-      response: "我已经为您生成了图像。"
+      name: "Image Generation Example",
+      description: "Generate high-quality images",
+      prompt: "Any image description",
+      response: "I have generated the image for you."
     }]
   }
 ];
 
-// 图像生成的模拟数据
+// Mock data for image generation
 export const mockImageUrls = [
   "https://via.placeholder.com/1024x1024/FF6B6B/FFFFFF?text=Mock+Image+1",
   "https://via.placeholder.com/1024x1024/4ECDC4/FFFFFF?text=Mock+Image+2",

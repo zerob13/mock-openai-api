@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenAI API 流式测试</title>
+    <title>OpenAI API Streaming Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -52,17 +52,17 @@
     </style>
 </head>
 <body>
-    <h1>OpenAI API 流式响应测试</h1>
+    <h1>OpenAI API Streaming Response Test</h1>
     
     <div>
-        <button onclick="testStream()">开始流式测试</button>
-        <button onclick="testNonStream()">测试非流式</button>
-        <button onclick="clearLog()">清空日志</button>
+        <button onclick="testStream()">Start Streaming Test</button>
+        <button onclick="testNonStream()">Test Non-Streaming</button>
+        <button onclick="clearLog()">Clear Log</button>
     </div>
     
-    <div id="status" class="status disconnected">状态: 未连接</div>
+    <div id="status" class="status disconnected">Status: Disconnected</div>
     
-    <h3>响应日志:</h3>
+    <h3>Response Log:</h3>
     <div id="log" class="log"></div>
 
     <script>
@@ -70,7 +70,7 @@
         const statusElement = document.getElementById('status');
         
         function updateStatus(text, connected = false) {
-            statusElement.textContent = `状态: ${text}`;
+            statusElement.textContent = `Status: ${text}`;
             statusElement.className = `status ${connected ? 'connected' : 'disconnected'}`;
         }
         
@@ -85,8 +85,8 @@
         }
         
         async function testStream() {
-            log('开始流式测试...');
-            updateStatus('连接中...', false);
+            log('Starting streaming test...');
+            updateStatus('Connecting...', false);
             
             try {
                 const response = await fetch('http://localhost:3000/v1/chat/completions', {
@@ -107,8 +107,8 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
-                updateStatus('已连接，接收数据中...', true);
-                log(`响应头部: Content-Type = ${response.headers.get('content-type')}`);
+                updateStatus('Connected, receiving data...', true);
+                log(`Response headers: Content-Type = ${response.headers.get('content-type')}`);
                 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -117,27 +117,27 @@
                     const { done, value } = await reader.read();
                     
                     if (done) {
-                        log('流式响应结束');
-                        updateStatus('流式响应完成', false);
+                        log('Streaming response ended');
+                        updateStatus('Streaming response completed', false);
                         break;
                     }
                     
                     const chunk = decoder.decode(value, { stream: true });
-                    log(`收到数据块: ${chunk}`);
+                    log(`Received data chunk: ${chunk}`);
                     
-                    // 解析 SSE 格式
+                    // Parse SSE format
                     const lines = chunk.split('\n');
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const data = line.slice(6);
                             if (data === '[DONE]') {
-                                log('收到结束标记: [DONE]');
+                                log('Received end marker: [DONE]');
                             } else {
                                 try {
                                     const parsed = JSON.parse(data);
-                                    log(`解析的数据: ${JSON.stringify(parsed, null, 2)}`);
+                                    log(`Parsed data: ${JSON.stringify(parsed, null, 2)}`);
                                 } catch (e) {
-                                    log(`解析 JSON 失败: ${data}`);
+                                    log(`Failed to parse JSON: ${data}`);
                                 }
                             }
                         }
@@ -145,14 +145,14 @@
                 }
                 
             } catch (error) {
-                log(`错误: ${error.message}`);
-                updateStatus('连接错误', false);
+                log(`Error: ${error.message}`);
+                updateStatus('Connection error', false);
             }
         }
         
         async function testNonStream() {
-            log('开始非流式测试...');
-            updateStatus('请求中...', false);
+            log('Starting non-streaming test...');
+            updateStatus('Requesting...', false);
             
             try {
                 const response = await fetch('http://localhost:3000/v1/chat/completions', {
@@ -170,12 +170,12 @@
                 });
                 
                 const data = await response.json();
-                log(`非流式响应: ${JSON.stringify(data, null, 2)}`);
-                updateStatus('非流式请求完成', false);
+                log(`Non-streaming response: ${JSON.stringify(data, null, 2)}`);
+                updateStatus('Non-streaming request completed', false);
                 
             } catch (error) {
-                log(`非流式请求错误: ${error.message}`);
-                updateStatus('请求错误', false);
+                log(`Non-streaming request error: ${error.message}`);
+                updateStatus('Request error', false);
             }
         }
     </script>
