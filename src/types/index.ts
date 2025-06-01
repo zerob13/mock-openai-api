@@ -12,14 +12,35 @@ export interface ModelsResponse {
   data: Model[];
 }
 
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface ToolCallDelta {
+  index?: number;
+  id?: string;
+  type?: 'function';
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'function';
-  content: string;
+  role: 'system' | 'user' | 'assistant' | 'function' | 'tool';
+  content: string | null;
   name?: string;
   function_call?: {
     name: string;
     arguments: string;
   };
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
 }
 
 export interface ChatCompletionRequest {
@@ -79,6 +100,7 @@ export interface ChatCompletionStreamChunk {
         name?: string;
         arguments?: string;
       };
+      tool_calls?: ToolCallDelta[];
     };
     logprobs?: null;
     finish_reason?: string | null;
@@ -129,12 +151,19 @@ export interface MockTestCase {
     name: string;
     arguments: any;
   };
+  toolCall?: {
+    name: string;
+    arguments: any;
+    id?: string;
+  };
+  toolCallResponse?: string;
+  toolCallResponseChunks?: string[];
 }
 
 export interface MockModel {
   id: string;
   name: string;
   description: string;
-  type: 'thinking' | 'function' | 'markdown' | 'image' | 'thinking-tag';
+  type: 'thinking' | 'markdown' | 'image' | 'thinking-tag' | 'tool-calls';
   testCases: MockTestCase[];
 } 

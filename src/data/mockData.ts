@@ -107,46 +107,137 @@ const thinkingTestCases: MockTestCase[] = [
   }
 ];
 
-// Function Call model test cases
+// Function Call model test cases (using OpenAI tool calls format)
 const functionTestCases: MockTestCase[] = [
   {
-    name: "Weather Query",
-    description: "Query weather information",
+    name: "Get Current Time",
+    description: "Get current time - tool call example based on real logs",
+    prompt: "What time is it now?",
+    response: "", // First phase returns no content, only tool call
+    toolCall: {
+      name: "get_time",
+      arguments: {},
+      id: "call_0_8a90fac8-b281-49a0-bcc9-55d7f4603891"
+    },
+    toolCallResponse: "Today is June 2, 2025.",
+    toolCallResponseChunks: [
+      "Today",
+      " is",
+      " June",
+      " 2,",
+      " 2025",
+      "."
+    ]
+  },
+  {
+    name: "Weather Tool Call",
+    description: "Weather query using tool calls",
     prompt: "What's the weather like in Beijing today?",
-    response: "Let me check the weather in Beijing for you today.",
-    functionCall: {
+    response: "",
+    toolCall: {
       name: "get_weather",
       arguments: {
         location: "Beijing",
         date: "today"
-      }
-    }
+      },
+      id: "call_1_weather_query_001"
+    },
+    toolCallResponse: "Beijing weather today: sunny, 25°C, light breeze, great for outdoor activities.",
+    toolCallResponseChunks: [
+      "Beijing",
+      " weather",
+      " today:",
+      " sunny,",
+      " 25°C,",
+      " light",
+      " breeze,",
+      " great",
+      " for",
+      " outdoor",
+      " activities."
+    ]
   },
   {
-    name: "Calculator",
-    description: "Perform mathematical calculations",
-    prompt: "Help me calculate 15 * 23",
-    response: "Let me calculate 15 multiplied by 23 for you.",
-    functionCall: {
+    name: "Calculator Tool Call",
+    description: "Mathematical calculation using tool calls",
+    prompt: "Help me calculate 123 multiplied by 456",
+    response: "",
+    toolCall: {
       name: "calculate",
       arguments: {
         operation: "multiply",
-        a: 15,
-        b: 23
-      }
-    }
+        a: 123,
+        b: 456
+      },
+      id: "call_2_calc_multiply_001"
+    },
+    toolCallResponse: "Calculation result: 123 × 456 = 56,088",
+    toolCallResponseChunks: [
+      "Calculation",
+      " result:",
+      " 123",
+      " × ",
+      "456",
+      " = ",
+      "56,088"
+    ]
   },
   {
-    name: "Time Query",
-    description: "Query current time",
-    prompt: "What time is it now?",
-    response: "Let me check the current time for you.",
-    functionCall: {
-      name: "get_time",
+    name: "Search Tool Call",
+    description: "Web search using tool calls",
+    prompt: "Search for the latest AI news",
+    response: "",
+    toolCall: {
+      name: "web_search",
       arguments: {
-        offset: "0"
-      }
-    }
+        query: "latest AI news",
+        limit: 5
+      },
+      id: "call_3_search_ai_news_001"
+    },
+    toolCallResponse: "Found the following latest AI news:\n\n1. OpenAI releases new GPT model version\n2. Google AI achieves breakthrough in medical diagnosis\n3. Microsoft launches new AI development tools\n4. Latest advances in AI for autonomous driving\n5. New AI ethics standards published",
+    toolCallResponseChunks: [
+      "Found",
+      " the",
+      " following",
+      " latest",
+      " AI news:",
+      "\n\n1. ",
+      "OpenAI",
+      " releases",
+      " new",
+      " GPT model",
+      " version",
+      "\n2. ",
+      "Google",
+      " AI",
+      " achieves",
+      " breakthrough",
+      " in",
+      " medical",
+      " diagnosis",
+      "\n3. ",
+      "Microsoft",
+      " launches",
+      " new",
+      " AI",
+      " development",
+      " tools",
+      "\n4. ",
+      "Latest",
+      " advances",
+      " in",
+      " AI",
+      " for",
+      " autonomous",
+      " driving",
+      "\n5. ",
+      "New",
+      " AI",
+      " ethics",
+      " standards",
+      " published"
+    ]
   }
 ];
 
@@ -217,8 +308,8 @@ This document comprehensively demonstrates all basic Markdown syntax, covering t
 [GitHub](https://github.com "GitHub Website")
 
 ### Images
-![Sample Image](https://via.placeholder.com/150 "Placeholder Image")
-![Image with Title](https://via.placeholder.com/300x100 "Custom Size Image")
+![Sample Image](https://placehold.co/150 "Placeholder Image")
+![Image with Title](https://placehold.co/300x100 "Custom Size Image")
 
 ---
 
@@ -334,8 +425,8 @@ Through the above examples, you can comprehensively understand the basic syntax 
       "### Task List\n- [x] Complete requirements analysis\n- [ ] Write documentation\n- [ ] Code review\n\n---\n\n",
       "## 4. Links and Images\n\n### Links\n[Google Search](https://www.google.com \"Google Search\")\n",
       "[GitHub](https://github.com \"GitHub Website\")\n\n### Images\n",
-      "![Sample Image](https://via.placeholder.com/150 \"Placeholder Image\")\n",
-      "![Image with Title](https://via.placeholder.com/300x100 \"Custom Size Image\")\n\n---\n\n",
+      "![Sample Image](https://placehold.co/150 \"Placeholder Image\")\n",
+      "![Image with Title](https://placehold.co/300x100 \"Custom Size Image\")\n\n---\n\n",
       "## 5. Code Blocks\n\n### Inline Code\nUse `console.log(\"Hello\")` for debugging.\n\n",
       "### Code Blocks\n```python\ndef hello():\n    print(\"Hello World!\")\n```\n\n",
       "```javascript\nconsole.log(\"JavaScript Example\");\n```\n\n",
@@ -382,8 +473,8 @@ export const mockModels: MockModel[] = [
   {
     id: "mock-gpt-function",
     name: "Mock GPT Function Calling",
-    description: "Model that supports function calling, suitable for testing tool integration",
-    type: "function",
+    description: "Model that supports function calling with OpenAI tool calls format, suitable for testing tool integration and two-phase call workflows",
+    type: "tool-calls",
     testCases: functionTestCases
   },
   {
@@ -409,9 +500,9 @@ export const mockModels: MockModel[] = [
 
 // Mock data for image generation
 export const mockImageUrls = [
-  "https://via.placeholder.com/1024x1024/FF6B6B/FFFFFF?text=Mock+Image+1",
-  "https://via.placeholder.com/1024x1024/4ECDC4/FFFFFF?text=Mock+Image+2",
-  "https://via.placeholder.com/1024x1024/45B7D1/FFFFFF?text=Mock+Image+3",
-  "https://via.placeholder.com/1024x1024/96CEB4/FFFFFF?text=Mock+Image+4",
-  "https://via.placeholder.com/1024x1024/FFEAA7/000000?text=Mock+Image+5"
+  "https://placehold.co/1024x1024/FF6B6B/FFFFFF?text=Mock+Image+1",
+  "https://placehold.co/1024x1024/4ECDC4/FFFFFF?text=Mock+Image+2",
+  "https://placehold.co/1024x1024/45B7D1/FFFFFF?text=Mock+Image+3",
+  "https://placehold.co/1024x1024/96CEB4/FFFFFF?text=Mock+Image+4",
+  "https://placehold.co/1024x1024/FFEAA7/000000?text=Mock+Image+5"
 ]; 

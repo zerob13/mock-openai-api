@@ -35,6 +35,11 @@ export function findModelById(modelId: string): MockModel | undefined {
 export function selectTestCase(model: MockModel, userPrompt: string): MockTestCase {
   const prompt = userPrompt.toLowerCase().trim();
   
+  // For markdown model, always return the first test case (the complete markdown example)
+  if (model.type === 'markdown') {
+    return model.testCases[0];
+  }
+  
   // Number matching logic - broader matching, consider it a hit if it contains numbers
   const numberMatch = prompt.match(/(\d+)/);
   if (numberMatch) {
@@ -42,8 +47,8 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
     if (index >= 0 && index < model.testCases.length) {
       return model.testCases[index];
     }
-    // Number out of range, return help information
-    return createHelpTestCase(model, userPrompt);
+    // Number out of range, return first test case instead of help
+    return model.testCases[0];
   }
   
   // Direct matching of test case prompts
@@ -59,9 +64,9 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   const programmingKeywords = ['python', 'javascript', 'code', 'programming', 'program', 'create', 'list'];
   const helpKeywords = ['help', '?', 'list', 'show'];
   
-  // Help keyword matching
+  // Help keyword matching - only show help for non-markdown models
   if (helpKeywords.some(keyword => prompt.includes(keyword))) {
-    return createHelpTestCase(model, userPrompt);
+    return createHelpTestCase(model);
   }
   
   if (greetingKeywords.some(keyword => prompt.includes(keyword))) {
@@ -90,22 +95,20 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   }
   
   // Default to first test case
-  return model.testCases[0] || createHelpTestCase(model, userPrompt);
+  return model.testCases[0];
 }
 
 /**
  * Create help test case for model
  */
-function createHelpTestCase(model: MockModel, userInput?: string): MockTestCase {
+function createHelpTestCase(model: MockModel): MockTestCase {
   const caseList = model.testCases.map((testCase, index) => 
     `${index + 1}. ${testCase.name} - ${testCase.description}\n   Example: "${testCase.prompt}"`
   ).join('\n\n');
   
-  const userInputSection = userInput ? `## Your Input:\n"${userInput}"\n\n` : '';
-  
   const helpContent = `# ${model.name} Available Test Cases
 
-${userInputSection}The following are the test cases supported by the current model. You can:
+The following are the test cases supported by the current model. You can:
 - Enter content containing numbers to select corresponding test cases (like "1", "select 2nd", "I want 3", etc.)
 - Enter related keywords for matching
 - Enter example prompts directly
@@ -128,7 +131,6 @@ ${caseList}
     response: helpContent,
     streamChunks: [
       `# ${model.name} Available Test Cases\n\n`,
-      userInputSection,
       `The following are the test cases supported by the current model. You can:\n`,
       `- Enter content containing numbers to select corresponding test cases (like "1", "select 2nd", "I want 3", etc.)\n`,
       `- Enter related keywords for matching\n`,
@@ -144,10 +146,8 @@ ${caseList}
 
   // If it's a thinking model, add reasoning_content
   if (model.type === 'thinking' || model.type === 'thinking-tag') {
-    const userInputReasoning = userInput ? `User entered: "${userInput}". ` : '';
-    helpCase.reasoning_content = `${userInputReasoning}User requested help information. I need to show them all available test cases for the current model ${model.name}, including instructions on how to quickly select through numbers.`;
+    helpCase.reasoning_content = `User requested help information. I need to show them all available test cases for the current model ${model.name}, including instructions on how to quickly select through numbers.`;
     helpCase.reasoning_chunks = [
-      userInput ? `User entered: "${userInput}". ` : '',
       "User requested",
       " help information.",
       " I need to show them",

@@ -58,7 +58,7 @@ export function createChatCompletion(request: ChatCompletionRequest): ChatComple
   }
 
   // Select test case
-  const testCase = selectTestCase(model, lastUserMessage.content);
+  const testCase = selectTestCase(model, lastUserMessage.content || '');
   
   const id = generateChatCompletionId();
   const timestamp = getCurrentTimestamp();
@@ -76,14 +76,27 @@ export function createChatCompletion(request: ChatCompletionRequest): ChatComple
     content
   };
 
-  // If it's a function calling model, add function call (markdown model won't execute this logic)
-  if (model.type === 'function' && testCase.functionCall) {
-    responseMessage.function_call = testCase.functionCall;
+  // If it's a tool calls model, add tool calls
+  if (model.type === 'tool-calls' && testCase.toolCall) {
+    responseMessage.content = null;
+    responseMessage.tool_calls = [{
+      id: testCase.toolCall.id || `call_${Date.now()}`,
+      type: 'function',
+      function: {
+        name: testCase.toolCall.name,
+        arguments: JSON.stringify(testCase.toolCall.arguments)
+      }
+    }];
   }
 
-  const promptTokens = calculateTokens(lastUserMessage.content);
-  const completionTokens = calculateTokens(testCase.response);
+  const promptTokens = calculateTokens(lastUserMessage.content || '');
+  const completionTokens = calculateTokens(testCase.response || '');
   const reasoningTokens = testCase.reasoning_content ? calculateTokens(testCase.reasoning_content) : 0;
+
+  let finishReason = 'stop';
+  if (testCase.toolCall) {
+    finishReason = 'tool_calls';
+  }
 
   const response: ChatCompletionResponse = {
     id,
@@ -93,7 +106,7 @@ export function createChatCompletion(request: ChatCompletionRequest): ChatComple
     choices: [{
       index: 0,
       message: responseMessage,
-      finish_reason: testCase.functionCall ? 'function_call' : 'stop'
+      finish_reason: finishReason
     }],
     usage: {
       prompt_tokens: promptTokens,
@@ -133,7 +146,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
   }
 
   // Select test case
-  const testCase = selectTestCase(model, lastUserMessage.content);
+  const testCase = selectTestCase(model, lastUserMessage.content || '');
   
   const id = generateChatCompletionId();
   const timestamp = getCurrentTimestamp();
@@ -157,7 +170,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
         delta: {
           role: 'assistant',
           content: null,
-          reasoning: testCase.reasoning_content || ''
+          reasoning_content: testCase.reasoning_content || ''
         },
         finish_reason: null
       }]
@@ -176,7 +189,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
           choices: [{
             index: 0,
             delta: {
-              reasoning: chunk
+              reasoning_content: chunk
             },
             finish_reason: null
           }]
@@ -196,7 +209,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
       choices: [{
         index: 0,
         delta: {
-          reasoning: null,
+          reasoning_content: null,
           content: ''
         },
         finish_reason: null
@@ -452,9 +465,10 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
       }
     }
 
-    // Handle function calls (only for function type models, markdown models won't execute this logic)
-    if (model.type === 'function' && testCase.functionCall) {
-      const functionCallChunk: ChatCompletionStreamChunk = {
+    // Handle tool calls (新的OpenAI格式)
+    if (model.type === 'tool-calls' && testCase.toolCall) {
+      // 第一阶段：发送tool call
+      const toolCallChunk: ChatCompletionStreamChunk = {
         id,
         object: 'chat.completion.chunk',
         created: timestamp,
@@ -463,17 +477,47 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
         choices: [{
           index: 0,
           delta: {
-            function_call: testCase.functionCall
+            tool_calls: [{
+              index: 0,
+              id: testCase.toolCall.id || `call_${Date.now()}`,
+              type: 'function',
+              function: {
+                name: testCase.toolCall.name,
+                arguments: ""
+              }
+            }]
           },
           finish_reason: null
         }]
       };
-      yield `data: ${JSON.stringify(functionCallChunk)}\n\n`;
+      yield `data: ${JSON.stringify(toolCallChunk)}\n\n`;
+
+      // 发送arguments
+      const argumentsChunk: ChatCompletionStreamChunk = {
+        id,
+        object: 'chat.completion.chunk',
+        created: timestamp,
+        model: request.model,
+        system_fingerprint: systemFingerprint,
+        choices: [{
+          index: 0,
+          delta: {
+            tool_calls: [{
+              index: 0,
+              function: {
+                arguments: JSON.stringify(testCase.toolCall.arguments)
+              }
+            }]
+          },
+          finish_reason: null
+        }]
+      };
+      yield `data: ${JSON.stringify(argumentsChunk)}\n\n`;
     }
   }
 
   // Calculate token usage
-  const promptTokens = calculateTokens(lastUserMessage.content);
+  const promptTokens = calculateTokens(lastUserMessage.content || '');
 
   // Send last chunk - contains finish_reason and usage
   const lastChunk: ChatCompletionStreamChunk = {
@@ -485,7 +529,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
     choices: [{
       index: 0,
       delta: {},
-      finish_reason: (model.type === 'function' && testCase.functionCall) ? 'function_call' : 'stop'
+      finish_reason: (model.type === 'tool-calls' && testCase.toolCall) ? 'tool_calls' : 'stop'
     }],
     usage: {
       prompt_tokens: promptTokens,
@@ -517,14 +561,14 @@ export function generateImage(request: ImageGenerationRequest): ImageGenerationR
   // If gpt-4o-image model is specified, use higher quality placeholder images
   if (model === 'gpt-4o-image') {
     imageUrls = [
-      `https://via.placeholder.com/${size}/FF6B6B/FFFFFF?text=GPT-4O+Image+1`,
-      `https://via.placeholder.com/${size}/4ECDC4/FFFFFF?text=GPT-4O+Image+2`,
-      `https://via.placeholder.com/${size}/45B7D1/FFFFFF?text=GPT-4O+Image+3`,
-      `https://via.placeholder.com/${size}/96CEB4/FFFFFF?text=GPT-4O+Image+4`,
-      `https://via.placeholder.com/${size}/FFEAA7/000000?text=GPT-4O+Image+5`,
-      `https://via.placeholder.com/${size}/DDA0DD/000000?text=GPT-4O+Image+6`,
-      `https://via.placeholder.com/${size}/F0E68C/000000?text=GPT-4O+Image+7`,
-      `https://via.placeholder.com/${size}/FFA07A/000000?text=GPT-4O+Image+8`
+      `https://placehold.co/${size}/FF6B6B/FFFFFF?text=GPT-4O+Image+1`,
+      `https://placehold.co/${size}/4ECDC4/FFFFFF?text=GPT-4O+Image+2`,
+      `https://placehold.co/${size}/45B7D1/FFFFFF?text=GPT-4O+Image+3`,
+      `https://placehold.co/${size}/96CEB4/FFFFFF?text=GPT-4O+Image+4`,
+      `https://placehold.co/${size}/FFEAA7/000000?text=GPT-4O+Image+5`,
+      `https://placehold.co/${size}/DDA0DD/000000?text=GPT-4O+Image+6`,
+      `https://placehold.co/${size}/F0E68C/000000?text=GPT-4O+Image+7`,
+      `https://placehold.co/${size}/FFA07A/000000?text=GPT-4O+Image+8`
     ];
   }
   
