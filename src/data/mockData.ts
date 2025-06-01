@@ -471,7 +471,7 @@ export const mockModels: MockModel[] = [
     testCases: thinkingTestCases
   },
   {
-    id: "mock-gpt-function",
+    id: "gpt-4-mock",
     name: "Mock GPT Function Calling",
     description: "Model that supports function calling with OpenAI tool calls format, suitable for testing tool integration and two-phase call workflows",
     type: "tool-calls",

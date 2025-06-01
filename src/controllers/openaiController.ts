@@ -4,8 +4,10 @@ import {
   getModels,
   createChatCompletion,
   createChatCompletionStream,
+  createToolCallResponseStream,
   generateImage
 } from '../services/openaiService';
+import { findModelById } from '../utils/helpers';
 
 /**
  * Get model list
@@ -54,6 +56,13 @@ export function handleChatCompletion(req: Request, res: Response) {
       });
     }
 
+    // Check if this is a tool-calls model and if we need to simulate the two-phase process
+    const model = findModelById(request.model);
+    const isToolCallModel = model && model.type === 'tool-calls';
+    
+    // Check if this is a request with tool results (second phase)
+    const hasToolResults = request.messages.some(msg => msg.role === 'tool');
+
     // Streaming response
     if (request.stream) {
       res.setHeader('Content-Type', 'text/event-stream');
@@ -65,9 +74,52 @@ export function handleChatCompletion(req: Request, res: Response) {
       // Flush headers to ensure client receives headers immediately
       res.flushHeaders();
 
-      const stream = createChatCompletionStream(request);
-      for (const chunk of stream) {
-        res.write(chunk);
+      if (isToolCallModel && hasToolResults) {
+        // This is the second phase of tool call - generate final response
+        const toolMessage = request.messages.find(msg => msg.role === 'tool');
+        const toolCallResponseStream = createToolCallResponseStream(
+          request, 
+          toolMessage?.tool_call_id || '', 
+          toolMessage?.content || ''
+        );
+        
+        for (const chunk of toolCallResponseStream) {
+          res.write(chunk);
+        }
+      } else if (isToolCallModel && !hasToolResults) {
+        // This is the first phase of tool call - but for demo purposes, 
+        // we'll simulate both phases automatically with a delay
+        const firstPhaseStream = createChatCompletionStream(request);
+        for (const chunk of firstPhaseStream) {
+          res.write(chunk);
+        }
+        
+        // Simulate a delay and automatic second phase
+        setTimeout(() => {
+          console.log('Loop iteration 2 for event simulated_event_id');
+          
+          // Create a simulated second phase request
+          const secondPhaseRequest = { ...request };
+          
+          const toolCallResponseStream = createToolCallResponseStream(
+            secondPhaseRequest, 
+            'call_0_8a90fac8-b281-49a0-bcc9-55d7f4603891', 
+            'simulated tool result'
+          );
+          
+          for (const chunk of toolCallResponseStream) {
+            res.write(chunk);
+          }
+          res.end();
+        }, 1000); // 1 second delay to simulate external tool execution
+        
+        return; // Don't end the response yet
+      } else {
+        // Normal streaming for non-tool-call models
+        const stream = createChatCompletionStream(request);
+        for (const chunk of stream) {
+          res.write(chunk);
+        }
       }
       res.end();
     } else {

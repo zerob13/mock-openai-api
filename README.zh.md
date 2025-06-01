@@ -103,12 +103,12 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 响应会包含 `<thinking>` 标签显示思考过程。
 
-### 2. mock-gpt-function
+### 2. gpt-4-mock
 **函数调用模型** - 支持工具和函数调用
 
 ```json
 {
-  "model": "mock-gpt-function",
+  "model": "gpt-4-mock",
   "messages": [{"role": "user", "content": "今天北京的天气怎么样？"}],
   "functions": [
     {
@@ -264,7 +264,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mock-gpt-function",
+    "model": "gpt-4-mock",
     "messages": [{"role": "user", "content": "现在几点了？"}]
   }'
 

@@ -4,11 +4,11 @@
 
 本项目支持两种函数调用格式：
 
-- `mock-gpt-function`: 支持新版OpenAI tool calls格式的模型
+- `gpt-4-mock`: 支持新版OpenAI tool calls格式的模型
 
 ## 模型特点
 
-### mock-gpt-function
+### gpt-4-mock
 - 使用新版 tool calls 格式
 - 支持两阶段调用流程
 - 第一阶段返回 tool_calls，第二阶段返回执行结果
@@ -39,13 +39,13 @@ npx mock-openai-api --help
 
 ## 使用示例
 
-### 基本调用 - mock-gpt-function
+### 基本调用 - gpt-4-mock
 
 ```bash
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mock-gpt-function",
+    "model": "gpt-4-mock",
     "messages": [
       {"role": "user", "content": "What time is it now?"}
     ],
@@ -53,13 +53,13 @@ curl -X POST http://localhost:3000/v1/chat/completions \
   }'
 ```
 
-### 流式调用 - mock-gpt-function
+### 流式调用 - gpt-4-mock
 
 ```bash
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mock-gpt-function",
+    "model": "gpt-4-mock",
     "messages": [
       {"role": "user", "content": "What time is it now?"}
     ],
@@ -77,7 +77,7 @@ npx mock-openai-api -v -p 8080
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mock-gpt-function",
+    "model": "gpt-4-mock",
     "messages": [
       {"role": "user", "content": "Calculate 123 * 456"}
     ],
@@ -87,7 +87,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 ## 支持的测试场景
 
-mock-gpt-function 模型包含以下预设测试场景：
+gpt-4-mock 模型包含以下预设测试场景：
 
 1. **获取当前时间**: `"What time is it now?"`
 2. **天气查询**: `"What's the weather like in Beijing today?"`
@@ -103,7 +103,7 @@ mock-gpt-function 模型包含以下预设测试场景：
   "id": "chatcmpl-123",
   "object": "chat.completion",
   "created": 1677652288,
-  "model": "mock-gpt-function",
+  "model": "gpt-4-mock",
   "choices": [{
     "index": 0,
     "message": {
@@ -130,7 +130,7 @@ mock-gpt-function 模型包含以下预设测试场景：
 
 ### 流式响应示例
 
-对于流式调用，mock-gpt-function 会先返回 tool_calls，然后在第二阶段返回执行结果的分块内容。
+对于流式调用，gpt-4-mock 会先返回 tool_calls，然后在第二阶段返回执行结果的分块内容。
 
 ## 测试文件
 
@@ -141,7 +141,7 @@ mock-gpt-function 模型包含以下预设测试场景：
 npm run dev
 
 # 在浏览器中打开 test-sse-client.html 文件
-# 选择 mock-gpt-function 模型进行测试
+# 选择 gpt-4-mock 模型进行测试
 ```
 
 ## 开发说明
@@ -179,4 +179,4 @@ npm run dev
 - `src/types/index.ts`: TypeScript 类型定义
 - `src/cli.ts`: 命令行接口
 
-可用模型: mock-gpt-thinking, mock-gpt-thinking-tag, mock-gpt-function, mock-gpt-markdown, gpt-4o-image 
+可用模型: mock-gpt-thinking, mock-gpt-thinking-tag, gpt-4-mock, mock-gpt-markdown, gpt-4o-image 

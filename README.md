@@ -103,12 +103,12 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 Response will include `<thinking>` tags showing the reasoning process.
 
-### 2. mock-gpt-function
+### 2. gpt-4-mock
 **Function Calling Model** - Supports tools and function calling
 
 ```json
 {
-  "model": "mock-gpt-function",
+  "model": "gpt-4-mock",
   "messages": [{"role": "user", "content": "What's the weather like in Beijing today?"}],
   "functions": [
     {
@@ -264,7 +264,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mock-gpt-function",
+    "model": "gpt-4-mock",
     "messages": [{"role": "user", "content": "What time is it now?"}]
   }'
 

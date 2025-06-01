@@ -57,6 +57,7 @@
     <div>
         <button onclick="testStream()">Start Streaming Test</button>
         <button onclick="testNonStream()">Test Non-Streaming</button>
+        <button onclick="testToolCalls()">Test Tool Calls</button>
         <button onclick="clearLog()">Clear Log</button>
     </div>
     
@@ -176,6 +177,83 @@
             } catch (error) {
                 log(`Non-streaming request error: ${error.message}`);
                 updateStatus('Request error', false);
+            }
+        }
+        
+        async function testToolCalls() {
+            log('Starting tool calls test...');
+            updateStatus('Testing tool calls...', false);
+            
+            try {
+                const response = await fetch('http://localhost:3000/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4-mock',
+                        messages: [
+                            { role: 'user', content: 'What time is it now?' }
+                        ],
+                        stream: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('Connected, receiving tool call data...', true);
+                log(`Response headers: Content-Type = ${response.headers.get('content-type')}`);
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        log('Tool calls streaming response ended');
+                        updateStatus('Tool calls streaming response completed', false);
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    log(`Received tool call chunk: ${chunk}`);
+                    
+                    // Parse SSE format
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                log('Received end marker: [DONE]');
+                            } else {
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    log(`Parsed tool call data: ${JSON.stringify(parsed, null, 2)}`);
+                                    
+                                    // Check if this contains tool_calls
+                                    if (parsed.choices?.[0]?.delta?.tool_calls) {
+                                        log('🔧 Tool call detected!');
+                                    }
+                                    
+                                    // Check if this is the second phase (content response)
+                                    if (parsed.choices?.[0]?.delta?.content && 
+                                        parsed.choices[0].delta.content.trim() !== '') {
+                                        log('📝 Tool response content: ' + parsed.choices[0].delta.content);
+                                    }
+                                } catch (e) {
+                                    log(`Failed to parse JSON: ${data}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                log(`Tool calls test error: ${error.message}`);
+                updateStatus('Tool calls test error', false);
             }
         }
     </script>
