@@ -6,35 +6,44 @@ const thinkingTestCases: MockTestCase[] = [
     name: "数学问题",
     description: "解决复杂数学问题",
     prompt: "计算 2+2",
-    response: `<thinking>
-这是一个简单的加法问题。我需要计算 2 + 2。
-2 + 2 = 4
-这是基础的算术运算。
-</thinking>
-
-2 + 2 = 4
-
-这是一个基础的加法运算。`,
+    reasoning_content: "这是一个简单的加法问题。我需要计算 2 + 2。2 + 2 = 4。这是基础的算术运算。",
+    reasoning_chunks: [
+      "这是一个简单的",
+      "加法问题。",
+      "我需要计算",
+      " 2 + 2。",
+      "2 + 2 = 4。",
+      "这是基础的",
+      "算术运算。"
+    ],
+    response: "2 + 2 = 4\n\n这是一个基础的加法运算。",
     streamChunks: [
-      "<thinking>\n这是一个简单的加法问题。我需要计算",
-      " 2 + 2。\n2 + 2 = 4\n这是基础的算术运算。\n</thinking>\n\n",
-      "2 + 2 = 4\n\n这是一个基础的加法运算。"
+      "2 + 2 = 4",
+      "\n\n这是一个",
+      "基础的",
+      "加法运算。"
     ]
   },
   {
     name: "编程问题",
     description: "代码问题解答",
     prompt: "如何用 Python 创建一个列表？",
-    response: `<thinking>
-用户询问如何用 Python 创建列表。这是一个基础的 Python 问题。
-Python 中创建列表有几种方式：
-1. 使用方括号 []
-2. 使用 list() 构造函数
-3. 使用列表推导式
-我应该提供清晰的例子。
-</thinking>
-
-在 Python 中创建列表有几种方式：
+    reasoning_content: "用户询问如何用 Python 创建列表。这是一个基础的 Python 问题。Python 中创建列表有几种方式：1. 使用方括号 [] 2. 使用 list() 构造函数 3. 使用列表推导式。我应该提供清晰的例子。",
+    reasoning_chunks: [
+      "用户询问如何用",
+      " Python 创建列表。",
+      "这是一个基础的",
+      " Python 问题。",
+      "Python 中创建列表",
+      "有几种方式：",
+      "1. 使用方括号 []",
+      " 2. 使用 list()",
+      " 构造函数",
+      " 3. 使用列表推导式。",
+      "我应该提供",
+      "清晰的例子。"
+    ],
+    response: `在 Python 中创建列表有几种方式：
 
 1. **空列表**：
    \`\`\`python
@@ -56,13 +65,44 @@ Python 中创建列表有几种方式：
    my_list = [x for x in range(10)]
    \`\`\``,
     streamChunks: [
-      "<thinking>\n用户询问如何用 Python 创建列表。这是一个基础的 Python 问题。\n",
-      "Python 中创建列表有几种方式：\n1. 使用方括号 []\n2. 使用 list() 构造函数\n",
-      "3. 使用列表推导式\n我应该提供清晰的例子。\n</thinking>\n\n",
-      "在 Python 中创建列表有几种方式：\n\n1. **空列表**：\n   ```python\n   my_list = []\n   ```\n\n",
-      "2. **带初始值的列表**：\n   ```python\n   my_list = [1, 2, 3, 4, 5]\n   ```\n\n",
-      "3. **使用 list() 构造函数**：\n   ```python\n   my_list = list()\n   ```\n\n",
-      "4. **列表推导式**：\n   ```python\n   my_list = [x for x in range(10)]\n   ```"
+      "在 Python 中创建列表",
+      "有几种方式：\n\n",
+      "1. **空列表**：\n   ```python\n",
+      "   my_list = []\n   ```\n\n",
+      "2. **带初始值的列表**：\n",
+      "   ```python\n   my_list = [1, 2, 3, 4, 5]\n",
+      "   ```\n\n3. **使用 list() 构造函数**：\n",
+      "   ```python\n   my_list = list()\n",
+      "   ```\n\n4. **列表推导式**：\n",
+      "   ```python\n   my_list = [x for x in range(10)]\n",
+      "   ```"
+    ]
+  },
+  {
+    name: "默认回复",
+    description: "通用友好回复",
+    prompt: "你好",
+    reasoning_content: "我们正在与用户进行对话，用户刚刚说：\"你好\"。根据对话历史，我们需要给出一个友好的回应。由于用户只是打招呼，我们不需要调用任何函数，直接回复即可。",
+    reasoning_chunks: [
+      "我们正在与",
+      "用户进行对话，",
+      "用户刚刚说：",
+      "\"你好\"。",
+      "根据对话历史，",
+      "我们需要给出",
+      "一个友好的回应。",
+      "由于用户只是",
+      "打招呼，我们",
+      "不需要调用任何",
+      "函数，直接回复",
+      "即可。"
+    ],
+    response: "你好！有什么可以帮您的吗？ 😊",
+    streamChunks: [
+      "你好！",
+      "有什么可以",
+      "帮您的吗？",
+      " 😊"
     ]
   }
 ];
@@ -102,9 +142,9 @@ const functionTestCases: MockTestCase[] = [
     prompt: "现在几点了？",
     response: "让我为您查询当前时间。",
     functionCall: {
-      name: "get_current_time",
+      name: "get_time",
       arguments: {
-        timezone: "Asia/Shanghai"
+        offset: "0"
       }
     }
   }
@@ -333,6 +373,13 @@ export const mockModels: MockModel[] = [
     testCases: thinkingTestCases
   },
   {
+    id: "mock-gpt-thinking-tag",
+    name: "Mock GPT 思考标签模式",
+    description: "支持在content中用<think>标签显示思考过程的模型",
+    type: "thinking-tag",
+    testCases: thinkingTestCases
+  },
+  {
     id: "mock-gpt-function",
     name: "Mock GPT 函数调用",
     description: "支持函数调用的模型，适合测试工具集成",
@@ -342,7 +389,7 @@ export const mockModels: MockModel[] = [
   {
     id: "mock-gpt-markdown",
     name: "Mock GPT Markdown 示例",
-    description: "始终输出标准 Markdown 格式，适合 UI 调试",
+    description: "专门输出标准 Markdown 格式的纯文本模型，不支持函数调用，专注于内容展示和 UI 调试",
     type: "markdown",
     testCases: markdownTestCases
   },

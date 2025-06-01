@@ -70,7 +70,8 @@ export interface ChatCompletionStreamChunk {
     index: number;
     delta: {
       role?: string;
-      content?: string;
+      content?: string | null;
+      reasoning_content?: string | null;
       function_call?: {
         name?: string;
         arguments?: string;
@@ -85,6 +86,9 @@ export interface ChatCompletionStreamChunk {
     total_tokens: number;
     prompt_tokens_details?: {
       cached_tokens: number;
+    };
+    completion_tokens_details?: {
+      reasoning_tokens: number;
     };
     prompt_cache_hit_tokens?: number;
     prompt_cache_miss_tokens?: number;
@@ -115,7 +119,9 @@ export interface MockTestCase {
   description: string;
   prompt: string;
   response: string;
+  reasoning_content?: string;
   streamChunks?: string[];
+  reasoning_chunks?: string[];
   functionCall?: {
     name: string;
     arguments: any;
@@ -126,6 +132,6 @@ export interface MockModel {
   id: string;
   name: string;
   description: string;
-  type: 'thinking' | 'function' | 'markdown' | 'image';
+  type: 'thinking' | 'function' | 'markdown' | 'image' | 'thinking-tag';
   testCases: MockTestCase[];
 } 

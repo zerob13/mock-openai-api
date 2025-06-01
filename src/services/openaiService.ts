@@ -64,12 +64,19 @@ export function createChatCompletion(request: ChatCompletionRequest): ChatComple
   const timestamp = getCurrentTimestamp();
   
   // 构建响应消息
+  let responseContent = testCase.response;
+  
+  // 如果是thinking-tag模型且有reasoning_content，则将其包装在<think>标签中
+  if (model.type === 'thinking-tag' && testCase.reasoning_content) {
+    responseContent = `<think>\n${testCase.reasoning_content}\n</think>\n\n${testCase.response}`;
+  }
+  
   const responseMessage: ChatMessage = {
     role: 'assistant',
-    content: testCase.response
+    content: responseContent
   };
 
-  // 如果是函数调用模型，添加函数调用
+  // 如果是函数调用模型，添加函数调用（markdown 模型不会执行此逻辑）
   if (model.type === 'function' && testCase.functionCall) {
     responseMessage.function_call = {
       name: testCase.functionCall.name,
@@ -128,34 +135,177 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
   const timestamp = getCurrentTimestamp();
   const systemFingerprint = `fp_${Math.random().toString(36).substr(2, 10)}_mock`;
 
-  // 发送第一个chunk - role 和空 content
-  const startChunk: ChatCompletionStreamChunk = {
-    id,
-    object: 'chat.completion.chunk',
-    created: timestamp,
-    model: request.model,
-    system_fingerprint: systemFingerprint,
-    choices: [{
-      index: 0,
-      delta: { 
-        role: 'assistant', 
-        content: '' 
-      },
-      logprobs: null,
-      finish_reason: null
-    }],
-    usage: null
-  };
-  
-  yield `data: ${JSON.stringify(startChunk)}\n\n`;
-
-  let totalTokens = 0;
   let completionTokens = 0;
+  let reasoningTokens = 0;
 
-  // 如果有预定义的流式chunk，使用它们
-  if (testCase.streamChunks && testCase.streamChunks.length > 0) {
-    for (const chunkContent of testCase.streamChunks) {
-      const chunk: ChatCompletionStreamChunk = {
+  // 思考模式：先输出reasoning_content，再输出content
+  if (model.type === 'thinking' && testCase.reasoning_content) {
+    // 发送第一个chunk - role 和空 reasoning_content
+    const startChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: { 
+          role: 'assistant', 
+          content: null,
+          reasoning_content: '' 
+        },
+        logprobs: null,
+        finish_reason: null
+      }],
+      usage: null
+    };
+    
+    yield `data: ${JSON.stringify(startChunk)}\n\n`;
+
+    // 输出reasoning_content chunks
+    if (testCase.reasoning_chunks && testCase.reasoning_chunks.length > 0) {
+      for (const reasoningChunk of testCase.reasoning_chunks) {
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { 
+              content: null,
+              reasoning_content: reasoningChunk 
+            },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        reasoningTokens += calculateTokens(reasoningChunk);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
+    }
+
+    // 开始输出content，reasoning_content设为null
+    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
+      for (const chunkContent of testCase.streamChunks) {
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { 
+              content: chunkContent,
+              reasoning_content: null 
+            },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(chunkContent);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
+    } else {
+      // 否则将完整响应分割成chunks
+      const words = testCase.response.split(' ');
+      for (let i = 0; i < words.length; i += 1) {
+        const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
+        
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { 
+              content: chunkContent,
+              reasoning_content: null 
+            },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(chunkContent);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
+    }
+  } else if (model.type === 'thinking-tag' && testCase.reasoning_content) {
+    // thinking-tag模式：在content中用<think>标签包围reasoning_content
+    // 发送第一个chunk - role 和空 content
+    const startChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: { 
+          role: 'assistant', 
+          content: '' 
+        },
+        logprobs: null,
+        finish_reason: null
+      }],
+      usage: null
+    };
+    
+    yield `data: ${JSON.stringify(startChunk)}\n\n`;
+
+    // 先输出<think>开始标签
+    const thinkStartChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: { content: '<think>\n' },
+        logprobs: null,
+        finish_reason: null
+      }],
+      usage: null
+    };
+    
+    completionTokens += calculateTokens('<think>\n');
+    yield `data: ${JSON.stringify(thinkStartChunk)}\n\n`;
+
+    // 输出reasoning_content chunks
+    if (testCase.reasoning_chunks && testCase.reasoning_chunks.length > 0) {
+      for (const reasoningChunk of testCase.reasoning_chunks) {
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { content: reasoningChunk },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(reasoningChunk);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
+    } else {
+      // 输出完整的reasoning_content
+      const reasoningChunk: ChatCompletionStreamChunk = {
         id,
         object: 'chat.completion.chunk',
         created: timestamp,
@@ -163,43 +313,154 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
         system_fingerprint: systemFingerprint,
         choices: [{
           index: 0,
-          delta: { content: chunkContent },
+          delta: { content: testCase.reasoning_content },
           logprobs: null,
           finish_reason: null
         }],
         usage: null
       };
       
-      completionTokens += calculateTokens(chunkContent);
-      yield `data: ${JSON.stringify(chunk)}\n\n`;
+      completionTokens += calculateTokens(testCase.reasoning_content);
+      yield `data: ${JSON.stringify(reasoningChunk)}\n\n`;
+    }
+
+    // 输出</think>结束标签和换行
+    const thinkEndChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: { content: '\n</think>\n\n' },
+        logprobs: null,
+        finish_reason: null
+      }],
+      usage: null
+    };
+    
+    completionTokens += calculateTokens('\n</think>\n\n');
+    yield `data: ${JSON.stringify(thinkEndChunk)}\n\n`;
+
+    // 输出正常的response content
+    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
+      for (const chunkContent of testCase.streamChunks) {
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { content: chunkContent },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(chunkContent);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
+    } else {
+      // 否则将完整响应分割成chunks
+      const words = testCase.response.split(' ');
+      for (let i = 0; i < words.length; i += 1) {
+        const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
+        
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { content: chunkContent },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(chunkContent);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
     }
   } else {
-    // 否则将完整响应分割成chunks
-    const words = testCase.response.split(' ');
-    for (let i = 0; i < words.length; i += 1) {
-      const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
-      
-      const chunk: ChatCompletionStreamChunk = {
-        id,
-        object: 'chat.completion.chunk',
-        created: timestamp,
-        model: request.model,
-        system_fingerprint: systemFingerprint,
-        choices: [{
-          index: 0,
-          delta: { content: chunkContent },
-          logprobs: null,
-          finish_reason: null
-        }],
-        usage: null
-      };
-      
-      completionTokens += calculateTokens(chunkContent);
-      yield `data: ${JSON.stringify(chunk)}\n\n`;
+    // 非思考模式：正常输出
+    // 发送第一个chunk - role 和空 content
+    const startChunk: ChatCompletionStreamChunk = {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model: request.model,
+      system_fingerprint: systemFingerprint,
+      choices: [{
+        index: 0,
+        delta: { 
+          role: 'assistant', 
+          content: '' 
+        },
+        logprobs: null,
+        finish_reason: null
+      }],
+      usage: null
+    };
+    
+    yield `data: ${JSON.stringify(startChunk)}\n\n`;
+
+    // 如果有预定义的流式chunk，使用它们
+    if (testCase.streamChunks && testCase.streamChunks.length > 0) {
+      for (const chunkContent of testCase.streamChunks) {
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { content: chunkContent },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(chunkContent);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
+    } else {
+      // 否则将完整响应分割成chunks
+      const words = testCase.response.split(' ');
+      for (let i = 0; i < words.length; i += 1) {
+        const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
+        
+        const chunk: ChatCompletionStreamChunk = {
+          id,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: request.model,
+          system_fingerprint: systemFingerprint,
+          choices: [{
+            index: 0,
+            delta: { content: chunkContent },
+            logprobs: null,
+            finish_reason: null
+          }],
+          usage: null
+        };
+        
+        completionTokens += calculateTokens(chunkContent);
+        yield `data: ${JSON.stringify(chunk)}\n\n`;
+      }
     }
   }
 
-  // 处理函数调用
+  // 处理函数调用（仅限 function 类型模型，markdown 模型不会执行此逻辑）
   if (model.type === 'function' && testCase.functionCall) {
     const functionChunk: ChatCompletionStreamChunk = {
       id,
@@ -226,7 +487,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
 
   // 计算 token 使用量
   const promptTokens = calculateTokens(lastUserMessage.content);
-  totalTokens = promptTokens + completionTokens;
+  const totalTokens = promptTokens + completionTokens + reasoningTokens;
 
   // 发送最后一个chunk - 包含 finish_reason 和 usage
   const endChunk: ChatCompletionStreamChunk = {
@@ -237,7 +498,10 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
     system_fingerprint: systemFingerprint,
     choices: [{
       index: 0,
-      delta: { content: '' },
+      delta: { 
+        content: '',
+        reasoning_content: null 
+      },
       logprobs: null,
       finish_reason: model.type === 'function' && testCase.functionCall ? 'function_call' : 'stop'
     }],
@@ -247,6 +511,9 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
       total_tokens: totalTokens,
       prompt_tokens_details: {
         cached_tokens: 0
+      },
+      completion_tokens_details: {
+        reasoning_tokens: reasoningTokens
       },
       prompt_cache_hit_tokens: 0,
       prompt_cache_miss_tokens: promptTokens

@@ -118,7 +118,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```
 
 ### 3. mock-gpt-markdown
-**Markdown 示例模型** - 始终输出标准 Markdown 格式
+**Markdown 示例模型** - 专门输出标准 Markdown 格式的纯文本模型
 
 ```json
 {
@@ -128,6 +128,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```
 
 响应将是一个完整的 Markdown 文档，包含各种格式元素，适合前端 UI 调试。
+**注意：** 此模型专注于内容展示，不支持函数调用功能，保持输出的纯净性。
 
 ### 4. gpt-4o-image
 **图像生成模型** - 专门用于图像生成
