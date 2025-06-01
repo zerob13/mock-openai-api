@@ -104,7 +104,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
   // 验证模型
   const model = findModelById(request.model);
   if (!model) {
-    const errorChunk = `data: ${JSON.stringify(formatErrorResponse(`模型 '${request.model}' 不存在`))}\\n\\n`;
+    const errorChunk = `data: ${JSON.stringify(formatErrorResponse(`模型 '${request.model}' 不存在`))}\n\n`;
     yield errorChunk;
     return;
   }
@@ -116,7 +116,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
     .find(msg => msg.role === 'user');
 
   if (!lastUserMessage) {
-    const errorChunk = `data: ${JSON.stringify(formatErrorResponse('未找到用户消息'))}\\n\\n`;
+    const errorChunk = `data: ${JSON.stringify(formatErrorResponse('未找到用户消息'))}\n\n`;
     yield errorChunk;
     return;
   }
@@ -126,21 +126,31 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
   
   const id = generateChatCompletionId();
   const timestamp = getCurrentTimestamp();
+  const systemFingerprint = `fp_${Math.random().toString(36).substr(2, 10)}_mock`;
 
-  // 发送开始chunk
+  // 发送第一个chunk - role 和空 content
   const startChunk: ChatCompletionStreamChunk = {
     id,
     object: 'chat.completion.chunk',
     created: timestamp,
     model: request.model,
+    system_fingerprint: systemFingerprint,
     choices: [{
       index: 0,
-      delta: { role: 'assistant' },
-      finish_reason: undefined
-    }]
+      delta: { 
+        role: 'assistant', 
+        content: '' 
+      },
+      logprobs: null,
+      finish_reason: null
+    }],
+    usage: null
   };
   
-  yield `data: ${JSON.stringify(startChunk)}\\n\\n`;
+  yield `data: ${JSON.stringify(startChunk)}\n\n`;
+
+  let totalTokens = 0;
+  let completionTokens = 0;
 
   // 如果有预定义的流式chunk，使用它们
   if (testCase.streamChunks && testCase.streamChunks.length > 0) {
@@ -150,34 +160,42 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
         object: 'chat.completion.chunk',
         created: timestamp,
         model: request.model,
+        system_fingerprint: systemFingerprint,
         choices: [{
           index: 0,
           delta: { content: chunkContent },
-          finish_reason: undefined
-        }]
+          logprobs: null,
+          finish_reason: null
+        }],
+        usage: null
       };
       
-      yield `data: ${JSON.stringify(chunk)}\\n\\n`;
+      completionTokens += calculateTokens(chunkContent);
+      yield `data: ${JSON.stringify(chunk)}\n\n`;
     }
   } else {
     // 否则将完整响应分割成chunks
     const words = testCase.response.split(' ');
-    for (let i = 0; i < words.length; i += 3) {
-      const chunkContent = words.slice(i, i + 3).join(' ') + (i + 3 < words.length ? ' ' : '');
+    for (let i = 0; i < words.length; i += 1) {
+      const chunkContent = words[i] + (i < words.length - 1 ? ' ' : '');
       
       const chunk: ChatCompletionStreamChunk = {
         id,
         object: 'chat.completion.chunk',
         created: timestamp,
         model: request.model,
+        system_fingerprint: systemFingerprint,
         choices: [{
           index: 0,
           delta: { content: chunkContent },
-          finish_reason: undefined
-        }]
+          logprobs: null,
+          finish_reason: null
+        }],
+        usage: null
       };
       
-      yield `data: ${JSON.stringify(chunk)}\\n\\n`;
+      completionTokens += calculateTokens(chunkContent);
+      yield `data: ${JSON.stringify(chunk)}\n\n`;
     }
   }
 
@@ -188,6 +206,7 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
       object: 'chat.completion.chunk',
       created: timestamp,
       model: request.model,
+      system_fingerprint: systemFingerprint,
       choices: [{
         index: 0,
         delta: {
@@ -196,28 +215,46 @@ export function* createChatCompletionStream(request: ChatCompletionRequest): Gen
             arguments: JSON.stringify(testCase.functionCall.arguments)
           }
         },
-        finish_reason: undefined
-      }]
+        logprobs: null,
+        finish_reason: null
+      }],
+      usage: null
     };
     
-    yield `data: ${JSON.stringify(functionChunk)}\\n\\n`;
+    yield `data: ${JSON.stringify(functionChunk)}\n\n`;
   }
 
-  // 发送结束chunk
+  // 计算 token 使用量
+  const promptTokens = calculateTokens(lastUserMessage.content);
+  totalTokens = promptTokens + completionTokens;
+
+  // 发送最后一个chunk - 包含 finish_reason 和 usage
   const endChunk: ChatCompletionStreamChunk = {
     id,
     object: 'chat.completion.chunk',
     created: timestamp,
     model: request.model,
+    system_fingerprint: systemFingerprint,
     choices: [{
       index: 0,
-      delta: {},
+      delta: { content: '' },
+      logprobs: null,
       finish_reason: model.type === 'function' && testCase.functionCall ? 'function_call' : 'stop'
-    }]
+    }],
+    usage: {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: totalTokens,
+      prompt_tokens_details: {
+        cached_tokens: 0
+      },
+      prompt_cache_hit_tokens: 0,
+      prompt_cache_miss_tokens: promptTokens
+    }
   };
   
-  yield `data: ${JSON.stringify(endChunk)}\\n\\n`;
-  yield 'data: [DONE]\\n\\n';
+  yield `data: ${JSON.stringify(endChunk)}\n\n`;
+  yield `data: [DONE]\n\n`;
 }
 
 /**

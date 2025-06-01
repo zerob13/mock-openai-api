@@ -55,11 +55,14 @@ export function handleChatCompletions(req: Request, res: Response) {
 
     // 流式响应
     if (request.stream) {
-      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Headers', '*');
+      
+      // 刷新头部，确保客户端立即收到头部信息
+      res.flushHeaders();
       
       const streamGenerator = createChatCompletionStream(request);
       

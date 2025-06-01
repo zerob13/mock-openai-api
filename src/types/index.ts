@@ -65,6 +65,7 @@ export interface ChatCompletionStreamChunk {
   object: string;
   created: number;
   model: string;
+  system_fingerprint?: string;
   choices: Array<{
     index: number;
     delta: {
@@ -75,8 +76,19 @@ export interface ChatCompletionStreamChunk {
         arguments?: string;
       };
     };
-    finish_reason?: string;
+    logprobs?: null;
+    finish_reason?: string | null;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    prompt_tokens_details?: {
+      cached_tokens: number;
+    };
+    prompt_cache_hit_tokens?: number;
+    prompt_cache_miss_tokens?: number;
+  } | null;
 }
 
 export interface ImageGenerationRequest {
