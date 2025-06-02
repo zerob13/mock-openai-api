@@ -27,6 +27,70 @@ npx mock-openai-api
 
 The server will start at `http://localhost:3000`.
 
+## ⚙️ CLI Options
+
+The mock server supports various command line options for customization:
+
+### Basic Usage
+
+```bash
+# Start with default settings
+npx mock-openai-api
+
+# Start on custom port
+npx mock-openai-api -p 8080
+
+# Start on custom host and port
+npx mock-openai-api -H localhost -p 8080
+
+# Enable verbose request logging
+npx mock-openai-api -v
+
+# Combine multiple options
+npx mock-openai-api -p 8080 -H 127.0.0.1 -v
+```
+
+### Available Options
+
+| Option             | Short | Description                       | Default   |
+| ------------------ | ----- | --------------------------------- | --------- |
+| `--port <number>`  | `-p`  | Server port                       | `3000`    |
+| `--host <address>` | `-H`  | Server host address               | `0.0.0.0` |
+| `--verbose`        | `-v`  | Enable request logging to console | `false`   |
+| `--version`        |       | Show version number               |           |
+| `--help`           |       | Show help information             |           |
+
+### Examples
+
+```bash
+# Development setup with verbose logging
+npx mock-openai-api -v -p 3001
+
+# Production-like setup
+npx mock-openai-api -H 0.0.0.0 -p 80
+
+# Local testing setup
+npx mock-openai-api -H localhost -p 8080 -v
+
+# Check version
+npx mock-openai-api --version
+
+# Get help
+npx mock-openai-api --help
+```
+
+When the server starts, it will display the configuration being used:
+
+```
+🚀 Mock OpenAI API server started successfully!
+📍 Server address: http://0.0.0.0:3000
+⚙️  Configuration:
+   • Port: 3000
+   • Host: 0.0.0.0
+   • Verbose logging: DISABLED
+   • Version: 1.0.1
+```
+
 ### Basic Usage
 
 ```bash
