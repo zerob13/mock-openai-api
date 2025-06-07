@@ -6,13 +6,12 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Copy source code
-COPY src ./
+# Install dependencies (without running prepare script)
+RUN npm ci --ignore-scripts
 
+# Copy source code and config
+COPY src ./src
 COPY tsconfig.json ./
-
-# Install dependencies
-RUN npm i
 
 # Build the application
 RUN npm run build
@@ -21,6 +20,12 @@ RUN npm run build
 FROM node:22-alpine
 
 WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
