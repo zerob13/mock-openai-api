@@ -18,6 +18,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   if (global.verboseLogging) {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    console.log(`Original URL: ${req.originalUrl}`);
+    console.log(`Base URL: ${req.baseUrl}`);
     if (req.body && Object.keys(req.body).length > 0) {
       console.log('Request body:', JSON.stringify(req.body, null, 2));
     }
@@ -25,16 +27,39 @@ app.use((req, res, next) => {
   next();
 });
 
+// Add a simple root endpoint for debugging
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Mock OpenAI API Server',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    availableEndpoints: [
+      'GET /health',
+      'GET /v1/models',
+      'POST /v1/chat/completions',
+      'POST /v1/images/generations'
+    ]
+  });
+});
+
 // Routes
 app.use('/', routes);
 
 // 404 handler
 app.use((req, res) => {
+  if (global.verboseLogging) {
+    console.log(`404 - Path not found: ${req.originalUrl}`);
+    console.log(`Method: ${req.method}`);
+    console.log(`Headers:`, req.headers);
+  }
   res.status(404).json({
     error: {
       message: `Path not found: ${req.originalUrl}`,
       type: 'not_found_error',
-      code: 'path_not_found'
+      code: 'path_not_found',
+      method: req.method,
+      path: req.path,
+      originalUrl: req.originalUrl
     }
   });
 });

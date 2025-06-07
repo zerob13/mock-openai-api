@@ -23,6 +23,7 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
+ENV VERBOSE=true
 
-# Start the application
-CMD ["node", "dist/index.js","-v"]
+# Start the application with verbose logging enabled
+CMD ["node", "dist/index.js"]
