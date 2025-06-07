@@ -44,8 +44,7 @@ RUN apk add --no-cache dumb-init
 WORKDIR /usr/src/app
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs &&
-  adduser -S nextjs -u 1001
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
 # Copy package files
 COPY package*.json ./
