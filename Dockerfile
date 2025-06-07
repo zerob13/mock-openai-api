@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies (without running prepare script)
-RUN npm ci --ignore-scripts
+RUN npm i
 
 # Copy source code and config
 COPY src ./src
@@ -20,12 +20,6 @@ RUN npm run build
 FROM node:22-alpine
 
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install production dependencies
-RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
