@@ -25,6 +25,4 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 
 # Start the application
-CMD ["node", "dist/index.js"]
-
-
+CMD ["node", "dist/index.js","-v"]
