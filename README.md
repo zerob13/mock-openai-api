@@ -1,9 +1,12 @@
 # Mock OpenAI API
 
 [![NPM Version](https://img.shields.io/npm/v/mock-openai-api)](https://www.npmjs.com/package/mock-openai-api)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zerob13/mock-openai-api)](https://hub.docker.com/r/zerob13/mock-openai-api)
+[![Docker Image Size](https://img.shields.io/docker/image-size/zerob13/mock-openai-api/latest)](https://hub.docker.com/r/zerob13/mock-openai-api)
 [![GitHub License](https://img.shields.io/github/license/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-404D59?style=flat&logo=express&logoColor=white)](https://expressjs.com/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![GitHub Stars](https://img.shields.io/github/stars/zerob13/mock-openai-api?style=social)](https://github.com/zerob13/mock-openai-api)
 [![GitHub Forks](https://img.shields.io/github/forks/zerob13/mock-openai-api?style=social)](https://github.com/zerob13/mock-openai-api/fork)
 
@@ -13,7 +16,59 @@ A complete OpenAI API compatible mock server that returns predefined test data w
 
 ## 🚀 Quick Start
 
-### Installation
+### Method 1: Docker (Recommended)
+
+The easiest way to run Mock OpenAI API is using Docker from [Docker Hub](https://hub.docker.com/r/zerob13/mock-openai-api):
+
+```bash
+# Pull and run the latest image
+docker run -p 3000:3000 zerob13/mock-openai-api:latest
+
+# Run with custom port
+docker run -p 8080:3000 zerob13/mock-openai-api:latest
+
+# Run with verbose logging
+docker run -p 3000:3000 -e VERBOSE=true zerob13/mock-openai-api:latest
+
+# Run in background (detached mode)
+docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:latest
+
+# Run with timezone setting
+docker run -p 3000:3000 -e TZ=Asia/Shanghai zerob13/mock-openai-api:latest
+```
+
+Available environment variables:
+- `PORT`: Server port (default: 3000)
+- `HOST`: Server host (default: 0.0.0.0)  
+- `VERBOSE`: Enable verbose logging (default: false)
+- `TZ`: Timezone setting (default: UTC)
+- `NODE_ENV`: Node.js environment (default: production)
+
+### Method 2: Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+services:
+  mock-openai-api:
+    image: zerob13/mock-openai-api:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - VERBOSE=false
+    restart: unless-stopped
+```
+
+Then run:
+
+```bash
+docker-compose up -d
+```
+
+### Method 3: NPM Installation
 
 ```bash
 npm install -g mock-openai-api
@@ -133,8 +188,10 @@ curl -X POST http://localhost:3000/v1/images/generations \
 - ✅ **Image generation support**
 - ✅ **Predefined test scenarios**
 - ✅ **Written in TypeScript**
+- ✅ **Docker support with multi-arch images (AMD64/ARM64)**
 - ✅ **Easy integration and deployment**
 - ✅ **Detailed error handling**
+- ✅ **Health check endpoint**
 
 ## 📋 Supported API Endpoints
 
@@ -279,31 +336,84 @@ const newTestCase: MockTestCase = {
 
 ## 🌐 Deployment
 
-### Docker Deployment
+### Docker Hub
 
-Create `Dockerfile`:
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
-```
-
-Build and run:
+Pre-built Docker images are available on Docker Hub and automatically updated with each release:
 
 ```bash
-docker build -t mock-openai-api .
-docker run -p 3000:3000 mock-openai-api
+# Latest stable version
+docker pull zerob13/mock-openai-api:latest
+
+# Specific version
+docker pull zerob13/mock-openai-api:v1.0.1
+
+# Run the container
+docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:latest
+```
+
+### Production Deployment
+
+```bash
+# Production deployment with custom configuration
+docker run -d \
+  --name mock-openai-api \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e PORT=3000 \
+  -e HOST=0.0.0.0 \
+  zerob13/mock-openai-api:latest
+
+# Health check
+curl http://localhost:3000/health
+```
+
+### Docker Compose (Production Ready)
+
+```yaml
+version: '3.8'
+services:
+  mock-openai-api:
+    image: zerob13/mock-openai-api:latest
+    container_name: mock-openai-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - VERBOSE=false
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+### Build from Source
+
+If you want to build the Docker image yourself:
+
+```bash
+# Clone the repository
+git clone https://github.com/zerob13/mock-openai-api.git
+cd mock-openai-api
+
+# Build the image
+docker build -t my-mock-openai-api .
+
+# Run your custom build
+docker run -p 3000:3000 my-mock-openai-api
 ```
 
 ### Environment Variables
 
+- `NODE_ENV` - Node environment (default: production)
 - `PORT` - Server port (default: 3000)
 - `HOST` - Server host (default: 0.0.0.0)
+- `VERBOSE` - Enable verbose logging (default: false)
 
 ## 🧪 Testing
 
