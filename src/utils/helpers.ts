@@ -34,12 +34,14 @@ export function findModelById(modelId: string): MockModel | undefined {
  */
 export function selectTestCase(model: MockModel, userPrompt: string): MockTestCase {
   const prompt = userPrompt.toLowerCase().trim();
-  
+
   // For markdown model, always return the first test case (the complete markdown example)
   if (model.type === 'markdown') {
-    return model.testCases[0];
+    const idx = Math.floor(getCurrentTimestamp() % model.testCases.length)
+    console.log('markdown model', idx);
+    return model.testCases[idx];
   }
-  
+
   // Number matching logic - broader matching, consider it a hit if it contains numbers
   const numberMatch = prompt.match(/(\d+)/);
   if (numberMatch) {
@@ -50,50 +52,50 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
     // Number out of range, return first test case instead of help
     return model.testCases[0];
   }
-  
+
   // Direct matching of test case prompts
   for (const testCase of model.testCases) {
     if (testCase.prompt.toLowerCase().trim() === prompt) {
       return testCase;
     }
   }
-  
+
   // Keyword matching
   const greetingKeywords = ['hello', 'hi', 'hey', 'greetings'];
   const mathKeywords = ['calculate', 'add', 'subtract', 'multiply', 'divide', '+', '-', '*', '/', 'math'];
   const programmingKeywords = ['python', 'javascript', 'code', 'programming', 'program', 'create', 'list'];
   const helpKeywords = ['help', '?', 'list', 'show'];
-  
+
   // Help keyword matching - only show help for non-markdown models
   if (helpKeywords.some(keyword => prompt.includes(keyword))) {
     return createHelpTestCase(model);
   }
-  
+
   if (greetingKeywords.some(keyword => prompt.includes(keyword))) {
-    const greetingCase = model.testCases.find(tc => 
+    const greetingCase = model.testCases.find(tc =>
       greetingKeywords.some(kw => tc.prompt.toLowerCase().includes(kw)) ||
       tc.name.toLowerCase().includes('default') ||
       tc.name.toLowerCase().includes('reply')
     );
     if (greetingCase) return greetingCase;
   }
-  
+
   if (mathKeywords.some(keyword => prompt.includes(keyword))) {
-    const mathCase = model.testCases.find(tc => 
+    const mathCase = model.testCases.find(tc =>
       mathKeywords.some(kw => tc.prompt.toLowerCase().includes(kw)) ||
       tc.name.toLowerCase().includes('math')
     );
     if (mathCase) return mathCase;
   }
-  
+
   if (programmingKeywords.some(keyword => prompt.includes(keyword))) {
-    const progCase = model.testCases.find(tc => 
+    const progCase = model.testCases.find(tc =>
       programmingKeywords.some(kw => tc.prompt.toLowerCase().includes(kw)) ||
       tc.name.toLowerCase().includes('programming')
     );
     if (progCase) return progCase;
   }
-  
+
   // Default to first test case
   return model.testCases[0];
 }
@@ -102,10 +104,10 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
  * Create help test case for model
  */
 function createHelpTestCase(model: MockModel): MockTestCase {
-  const caseList = model.testCases.map((testCase, index) => 
+  const caseList = model.testCases.map((testCase, index) =>
     `${index + 1}. ${testCase.name} - ${testCase.description}\n   Example: "${testCase.prompt}"`
   ).join('\n\n');
-  
+
   const helpContent = `# ${model.name} Available Test Cases
 
 The following are the test cases supported by the current model. You can:

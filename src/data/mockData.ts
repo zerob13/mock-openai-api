@@ -318,21 +318,350 @@ This document comprehensively demonstrates all basic Markdown syntax, covering t
 ### Inline Code
 Use \`console.log("Hello")\` for debugging.
 
-### Code Blocks
+### Programming Languages
+
+#### Python
 \`\`\`python
 def hello():
     print("Hello World!")
+    return "success"
 \`\`\`
 
+#### JavaScript
 \`\`\`javascript
 console.log("JavaScript Example");
+const greeting = () => "Hello World!";
 \`\`\`
 
+#### TypeScript
+\`\`\`typescript
+interface User {
+  name: string;
+  age: number;
+}
+
+const user: User = {
+  name: "John",
+  age: 30
+};
+\`\`\`
+
+#### C++
+\`\`\`cpp
+#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello World!" << endl;
+    return 0;
+}
+\`\`\`
+
+#### Java
+\`\`\`java
+public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello World!");
+    }
+}
+\`\`\`
+
+#### Swift
+\`\`\`swift
+import Foundation
+
+func greet(name: String) -> String {
+    return "Hello, \\(name)!"
+}
+
+print(greet(name: "World"))
+\`\`\`
+
+#### Shell/Bash
+\`\`\`bash
+#!/bin/bash
+echo "Hello World!"
+for i in {1..5}; do
+    echo "Count: $i"
+done
+\`\`\`
+
+### Frontend Frameworks
+
+#### React (JSX)
+\`\`\`jsx
+import React from 'react';
+
+const HelloComponent = ({ name }) => {
+  return (
+    <div className="greeting">
+      <h1>Hello, {name}!</h1>
+      <button onClick={() => alert('Clicked!')}>
+        Click me
+      </button>
+    </div>
+  );
+};
+
+export default HelloComponent;
+\`\`\`
+
+#### Vue
+\`\`\`vue
+<template>
+  <div class="hello">
+    <h1>{{ message }}</h1>
+    <button @click="updateMessage">Update</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      message: 'Hello Vue!'
+    }
+  },
+  methods: {
+    updateMessage() {
+      this.message = 'Updated!';
+    }
+  }
+}
+</script>
+
+<style scoped>
+.hello {
+  color: #42b983;
+}
+</style>
+\`\`\`
+
+### Data & Configuration
+
+#### JSON
 \`\`\`json
 {
   "name": "Markdown",
-  "version": "1.0"
+  "version": "1.0",
+  "dependencies": {
+    "react": "^18.0.0",
+    "typescript": "^4.9.0"
+  }
 }
+\`\`\`
+
+#### YAML
+\`\`\`yaml
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+\`\`\`
+
+#### XML
+\`\`\`xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <database>
+    <host>localhost</host>
+    <port>5432</port>
+  </database>
+</configuration>
+\`\`\`
+
+### Database & Query Languages
+
+#### SQL
+\`\`\`sql
+SELECT u.name, u.email, COUNT(o.id) as order_count
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE u.created_at >= '2023-01-01'
+GROUP BY u.id, u.name, u.email
+ORDER BY order_count DESC;
+\`\`\`
+
+#### GraphQL
+\`\`\`graphql
+query GetUser($id: ID!) {
+  user(id: $id) {
+    name
+    email
+    posts {
+      title
+      content
+      createdAt
+    }
+  }
+}
+\`\`\`
+
+### Markup & Styling
+
+#### HTML
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sample Page</title>
+</head>
+<body>
+    <h1>Welcome</h1>
+    <p>This is a sample HTML page.</p>
+</body>
+</html>
+\`\`\`
+
+#### CSS
+\`\`\`css
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+\`\`\`
+
+#### SCSS/Sass
+\`\`\`scss
+$primary-color: #3498db;
+$border-radius: 4px;
+
+.button {
+  background-color: $primary-color;
+  border-radius: $border-radius;
+  padding: 0.5rem 1rem;
+  
+  &:hover {
+    background-color: darken($primary-color, 10%);
+  }
+  
+  &.large {
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+  }
+}
+\`\`\`
+
+### Diagrams & Graphics
+
+#### Mermaid
+\`\`\`mermaid
+graph TD
+    A[Start] --> B{Is it working?}
+    B -->|Yes| C[Great!]
+    B -->|No| D[Debug]
+    D --> E[Fix Issue]
+    E --> B
+    C --> F[End]
+\`\`\`
+
+#### SVG
+\`\`\`svg
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="100" cy="100" r="80" fill="#3498db" stroke="#2c3e50" stroke-width="4"/>
+  <text x="100" y="105" text-anchor="middle" fill="white" font-size="16">SVG Circle</text>
+</svg>
+\`\`\`
+
+### Other Languages
+
+#### Go
+\`\`\`go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, World!")
+    
+    numbers := []int{1, 2, 3, 4, 5}
+    for _, num := range numbers {
+        fmt.Printf("Number: %d\\n", num)
+    }
+}
+\`\`\`
+
+#### Rust
+\`\`\`rust
+fn main() {
+    let greeting = "Hello, World!";
+    println!("{}", greeting);
+    
+    let numbers: Vec<i32> = (1..=5).collect();
+    for num in &numbers {
+        println!("Number: {}", num);
+    }
+}
+\`\`\`
+
+#### PHP
+\`\`\`php
+<?php
+class Greeting {
+    private $message;
+    
+    public function __construct($message) {
+        $this->message = $message;
+    }
+    
+    public function say() {
+        echo $this->message . "\\n";
+    }
+}
+
+$greeting = new Greeting("Hello World!");
+$greeting->say();
+?>
+\`\`\`
+
+#### Ruby
+\`\`\`ruby
+class Greeting
+  def initialize(message)
+    @message = message
+  end
+  
+  def say
+    puts @message
+  end
+end
+
+greeting = Greeting.new("Hello World!")
+greeting.say
+\`\`\`
+
+#### Dockerfile
+\`\`\`dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
 \`\`\`
 
 ---
@@ -428,9 +757,30 @@ Through the above examples, you can comprehensively understand the basic syntax 
       "![Sample Image](https://placehold.co/150 \"Placeholder Image\")\n",
       "![Image with Title](https://placehold.co/300x100 \"Custom Size Image\")\n\n---\n\n",
       "## 5. Code Blocks\n\n### Inline Code\nUse `console.log(\"Hello\")` for debugging.\n\n",
-      "### Code Blocks\n```python\ndef hello():\n    print(\"Hello World!\")\n```\n\n",
-      "```javascript\nconsole.log(\"JavaScript Example\");\n```\n\n",
-      "```json\n{\n  \"name\": \"Markdown\",\n  \"version\": \"1.0\"\n}\n```\n\n---\n\n",
+      "### Programming Languages\n\n#### Python\n```python\ndef hello():\n    print(\"Hello World!\")\n    return \"success\"\n```\n\n",
+      "#### JavaScript\n```javascript\nconsole.log(\"JavaScript Example\");\nconst greeting = () => \"Hello World!\";\n```\n\n",
+      "#### TypeScript\n```typescript\ninterface User {\n  name: string;\n  age: number;\n}\n\nconst user: User = {\n  name: \"John\",\n  age: 30\n};\n```\n\n",
+      "#### C++\n```cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << \"Hello World!\" << endl;\n    return 0;\n}\n```\n\n",
+      "#### Java\n```java\npublic class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println(\"Hello World!\");\n    }\n}\n```\n\n",
+      "#### Swift\n```swift\nimport Foundation\n\nfunc greet(name: String) -> String {\n    return \"Hello, \\(name)!\"\n}\n\nprint(greet(name: \"World\"))\n```\n\n",
+      "#### Shell/Bash\n```bash\n#!/bin/bash\necho \"Hello World!\"\nfor i in {1..5}; do\n    echo \"Count: $i\"\ndone\n```\n\n",
+      "### Frontend Frameworks\n\n#### React (JSX)\n```jsx\nimport React from 'react';\n\nconst HelloComponent = ({ name }) => {\n  return (\n    <div className=\"greeting\">\n      <h1>Hello, {name}!</h1>\n      <button onClick={() => alert('Clicked!')}>\n        Click me\n      </button>\n    </div>\n  );\n};\n\nexport default HelloComponent;\n```\n\n",
+      "#### Vue\n```vue\n<template>\n  <div class=\"hello\">\n    <h1>{{ message }}</h1>\n    <button @click=\"updateMessage\">Update</button>\n  </div>\n</template>\n\n<script>\nexport default {\n  data() {\n    return {\n      message: 'Hello Vue!'\n    }\n  },\n  methods: {\n    updateMessage() {\n      this.message = 'Updated!';\n    }\n  }\n}\n</script>\n\n<style scoped>\n.hello {\n  color: #42b983;\n}\n</style>\n```\n\n",
+      "### Data & Configuration\n\n#### JSON\n```json\n{\n  \"name\": \"Markdown\",\n  \"version\": \"1.0\",\n  \"dependencies\": {\n    \"react\": \"^18.0.0\",\n    \"typescript\": \"^4.9.0\"\n  }\n}\n```\n\n",
+      "#### YAML\n```yaml\nname: CI/CD Pipeline\non:\n  push:\n    branches: [ main ]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - name: Setup Node\n        uses: actions/setup-node@v3\n```\n\n",
+      "#### XML\n```xml\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n  <database>\n    <host>localhost</host>\n    <port>5432</port>\n  </database>\n</configuration>\n```\n\n",
+      "### Database & Query Languages\n\n#### SQL\n```sql\nSELECT u.name, u.email, COUNT(o.id) as order_count\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nWHERE u.created_at >= '2023-01-01'\nGROUP BY u.id, u.name, u.email\nORDER BY order_count DESC;\n```\n\n",
+      "#### GraphQL\n```graphql\nquery GetUser($id: ID!) {\n  user(id: $id) {\n    name\n    email\n    posts {\n      title\n      content\n      createdAt\n    }\n  }\n}\n```\n\n",
+      "### Markup & Styling\n\n#### HTML\n```html\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Sample Page</title>\n</head>\n<body>\n    <h1>Welcome</h1>\n    <p>This is a sample HTML page.</p>\n</body>\n</html>\n```\n\n",
+      "#### CSS\n```css\n.container {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  min-height: 100vh;\n  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n}\n\n.card {\n  background: white;\n  border-radius: 8px;\n  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);\n  padding: 2rem;\n}\n```\n\n",
+      "#### SCSS/Sass\n```scss\n$primary-color: #3498db;\n$border-radius: 4px;\n\n.button {\n  background-color: $primary-color;\n  border-radius: $border-radius;\n  padding: 0.5rem 1rem;\n  \n  &:hover {\n    background-color: darken($primary-color, 10%);\n  }\n  \n  &.large {\n    padding: 1rem 2rem;\n    font-size: 1.2rem;\n  }\n}\n```\n\n",
+      "### Diagrams & Graphics\n\n#### Mermaid\n```mermaid\ngraph TD\n    A[Start] --> B{Is it working?}\n    B -->|Yes| C[Great!]\n    B -->|No| D[Debug]\n    D --> E[Fix Issue]\n    E --> B\n    C --> F[End]\n```\n\n",
+      "#### SVG\n```svg\n<svg width=\"200\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n  <circle cx=\"100\" cy=\"100\" r=\"80\" fill=\"#3498db\" stroke=\"#2c3e50\" stroke-width=\"4\"/>\n  <text x=\"100\" y=\"105\" text-anchor=\"middle\" fill=\"white\" font-size=\"16\">SVG Circle</text>\n</svg>\n```\n\n",
+      "### Other Languages\n\n#### Go\n```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, World!\")\n    \n    numbers := []int{1, 2, 3, 4, 5}\n    for _, num := range numbers {\n        fmt.Printf(\"Number: %d\\n\", num)\n    }\n}\n```\n\n",
+      "#### Rust\n```rust\nfn main() {\n    let greeting = \"Hello, World!\";\n    println!(\"{}\", greeting);\n    \n    let numbers: Vec<i32> = (1..=5).collect();\n    for num in &numbers {\n        println!(\"Number: {}\", num);\n    }\n}\n```\n\n",
+      "#### PHP\n```php\n<?php\nclass Greeting {\n    private $message;\n    \n    public function __construct($message) {\n        $this->message = $message;\n    }\n    \n    public function say() {\n        echo $this->message . \"\\n\";\n    }\n}\n\n$greeting = new Greeting(\"Hello World!\");\n$greeting->say();\n?>\n```\n\n",
+      "#### Ruby\n```ruby\nclass Greeting\n  def initialize(message)\n    @message = message\n  end\n  \n  def say\n    puts @message\n  end\nend\n\ngreeting = Greeting.new(\"Hello World!\")\ngreeting.say\n```\n\n",
+      "#### Dockerfile\n```dockerfile\nFROM node:18-alpine\n\nWORKDIR /app\n\nCOPY package*.json ./\nRUN npm ci --only=production\n\nCOPY . .\n\nEXPOSE 3000\n\nCMD [\"npm\", \"start\"]\n```\n\n---\n\n",
       "## 6. Tables\n\n| Name     | Age | City       | Notes          |\n",
       "|----------|-----|------------|----------------|\n",
       "| John     | 28  | New York   | Manager        |\n| Jane     | 32  | Los Angeles| Engineer       |\n",
@@ -451,7 +801,154 @@ Through the above examples, you can comprehensively understand the basic syntax 
       "Through the above examples, you can comprehensively understand the basic syntax and style applications of Markdown.",
       " In actual use, you can combine different elements as needed to create documents with clear structure and beautiful formatting."
     ]
+  },
+  {
+    name: "HTML Artifact Example",
+    description: "Interactive HTML artifact with weather data display",
+    prompt: "Create a weather dashboard for Shanghai",
+    response: `<antThinking>
+Creating an HTML artifact to display mock weather data for Shanghai is substantial and self-contained content. It qualifies as an artifact because it can be rendered as a webpage and reused or modified by the user. This is a new request, so I'll create a new artifact.
+</antThinking>
+
+<antArtifact identifier="shanghai-weather" type="text/html" title="Shanghai Weather Mock Data">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shanghai Weather</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #0078d7;
+        }
+        .weather-info {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .weather-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #e6f2ff;
+            border-radius: 5px;
+        }
+        .weather-card h2 {
+            margin: 0;
+            color: #0056b3;
+        }
+        .weather-card p {
+            margin: 5px 0;
+        }
+        .weather-card .temp {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0078d7;
+        }
+        .weather-card .description {
+            font-style: italic;
+        }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Shanghai Weather</h1>
+        <div class="weather-info">
+            <div class="weather-card">
+                <div>
+                    <h2>Today</h2>
+                    <p class="description">Partly cloudy</p>
+                </div>
+                <div class="temp">25°C</div>
+            </div>
+            <div class="weather-card">
+                <div>
+                    <h2>Tomorrow</h2>
+                    <p class="description">Sunny</p>
+                </div>
+                <div class="temp">28°C</div>
+            </div>
+            <div class="weather-card">
+                <div>
+                    <h2>Day After Tomorrow</h2>
+                    <p class="description">Light rain</p>
+                </div>
+                <div class="temp">22°C</div>
+            </div>
+        </div>
+        <footer>
+            Generated with <a href="https://github.com/ThinkInAIXYZ/deepchat">DeepChat</a> | All page content is AI-generated and for reference only
+        </footer>
+    </div>
+</body>
+</html>
+</antArtifact>`,
+    streamChunks: [
+      "<antThinking>\nCreating an HTML artifact to display mock weather data for Shanghai is substantial and self-contained content.",
+      " It qualifies as an artifact because it can be rendered as a webpage and reused or modified by the user.",
+      " This is a new request, so I'll create a new artifact.\n</antThinking>\n\n",
+      "<antArtifact identifier=\"shanghai-weather\" type=\"text/html\" title=\"Shanghai Weather Mock Data\">\n",
+      "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n",
+      "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Shanghai Weather</title>\n",
+      "    <style>\n        body {\n            font-family: Arial, sans-serif;\n",
+      "            margin: 0;\n            padding: 0;\n            background-color: #f4f4f9;\n",
+      "            color: #333;\n        }\n        .container {\n",
+      "            max-width: 800px;\n            margin: 20px auto;\n            padding: 20px;\n",
+      "            background: #fff;\n            border-radius: 8px;\n",
+      "            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);\n        }\n",
+      "        h1 {\n            text-align: center;\n            color: #0078d7;\n        }\n",
+      "        .weather-info {\n            display: flex;\n            flex-direction: column;\n",
+      "            gap: 20px;\n        }\n        .weather-card {\n",
+      "            display: flex;\n            justify-content: space-between;\n            align-items: center;\n",
+      "            padding: 15px;\n            background: #e6f2ff;\n            border-radius: 5px;\n        }\n",
+      "        .weather-card h2 {\n            margin: 0;\n            color: #0056b3;\n        }\n",
+      "        .weather-card p {\n            margin: 5px 0;\n        }\n",
+      "        .weather-card .temp {\n            font-size: 24px;\n            font-weight: bold;\n",
+      "            color: #0078d7;\n        }\n        .weather-card .description {\n",
+      "            font-style: italic;\n        }\n        footer {\n",
+      "            text-align: center;\n            margin-top: 20px;\n            font-size: 12px;\n",
+      "            color: #666;\n        }\n    </style>\n</head>\n<body>\n",
+      "    <div class=\"container\">\n        <h1>Shanghai Weather</h1>\n",
+      "        <div class=\"weather-info\">\n            <div class=\"weather-card\">\n",
+      "                <div>\n                    <h2>Today</h2>\n",
+      "                    <p class=\"description\">Partly cloudy</p>\n                </div>\n",
+      "                <div class=\"temp\">25°C</div>\n            </div>\n",
+      "            <div class=\"weather-card\">\n                <div>\n",
+      "                    <h2>Tomorrow</h2>\n                    <p class=\"description\">Sunny</p>\n",
+      "                </div>\n                <div class=\"temp\">28°C</div>\n            </div>\n",
+      "            <div class=\"weather-card\">\n                <div>\n",
+      "                    <h2>Day After Tomorrow</h2>\n                    <p class=\"description\">Light rain</p>\n",
+      "                </div>\n                <div class=\"temp\">22°C</div>\n            </div>\n",
+      "        </div>\n        <footer>\n            Generated with ",
+      "<a href=\"https://github.com/ThinkInAIXYZ/deepchat\">DeepChat</a>",
+      " | All page content is AI-generated and for reference only\n        </footer>\n",
+      "    </div>\n</body>\n</html>\n</antArtifact>"
+    ]
   }
+
 ];
 
 // Predefined model list
