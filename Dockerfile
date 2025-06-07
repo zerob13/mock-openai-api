@@ -43,9 +43,6 @@ RUN apk add --no-cache dumb-init
 # Create app directory
 WORKDIR /usr/src/app
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
-
 # Copy package files
 COPY package*.json ./
 
@@ -57,6 +54,9 @@ COPY --from=builder /usr/src/app/dist ./dist
 
 # Copy necessary files
 COPY README.md LICENSE ./
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
 # Change ownership to non-root user
 RUN chown -R nextjs:nodejs /usr/src/app
