@@ -16,9 +16,31 @@ A complete OpenAI API compatible mock server that returns predefined test data w
 
 ## 🚀 Quick Start
 
-### Method 1: Docker (Recommended)
+### Method 1: Public Service (No Setup Required)
 
-The easiest way to run Mock OpenAI API is using Docker from [Docker Hub](https://hub.docker.com/r/zerob13/mock-openai-api):
+The quickest way to get started is using our public deployment service:
+
+**Base URL**: `https://mockllm.anya2a.com/v1`  
+**API Key**: `DeepChat`
+
+```bash
+# Test the public service
+curl https://mockllm.anya2a.com/v1/models \
+  -H "Authorization: Bearer DeepChat"
+
+# Chat completion example
+curl -X POST https://mockllm.anya2a.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer DeepChat" \
+  -d '{
+    "model": "mock-gpt-thinking",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+### Method 2: Docker (Recommended for Local Development)
+
+The easiest way to run Mock OpenAI API locally is using Docker from [Docker Hub](https://hub.docker.com/r/zerob13/mock-openai-api):
 
 ```bash
 # Pull and run the latest image
@@ -44,7 +66,7 @@ Available environment variables:
 - `TZ`: Timezone setting (default: UTC)
 - `NODE_ENV`: Node.js environment (default: production)
 
-### Method 2: Docker Compose
+### Method 3: Docker Compose
 
 Create a `docker-compose.yml` file:
 
@@ -68,7 +90,7 @@ Then run:
 docker-compose up -d
 ```
 
-### Method 3: NPM Installation
+### Method 4: NPM Installation
 
 ```bash
 npm install -g mock-openai-api
@@ -420,10 +442,13 @@ docker run -p 3000:3000 my-mock-openai-api
 ### Testing with curl
 
 ```bash
-# Test health check
-curl http://localhost:3000/health
+# Test public service
+curl https://mockllm.anya2a.com/health
+curl https://mockllm.anya2a.com/v1/models \
+  -H "Authorization: Bearer DeepChat"
 
-# Test model list
+# Test local service
+curl http://localhost:3000/health
 curl http://localhost:3000/v1/models
 
 # Test thinking model
@@ -475,7 +500,14 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```javascript
 import OpenAI from 'openai';
 
+// Using the public service
 const client = new OpenAI({
+  baseURL: 'https://mockllm.anya2a.com/v1',
+  apiKey: 'DeepChat'
+});
+
+// Or using local deployment
+const localClient = new OpenAI({
   baseURL: 'http://localhost:3000/v1',
   apiKey: 'mock-key' // can be any value
 });

@@ -13,7 +13,29 @@
 
 ## 🚀 快速开始
 
-### 安装
+### 方法 1：公共服务（无需安装配置）
+
+最快的使用方式是直接使用我们的公共部署服务：
+
+**服务地址**: `https://mockllm.anya2a.com/v1`  
+**API密钥**: `DeepChat`
+
+```bash
+# 测试公共服务
+curl https://mockllm.anya2a.com/v1/models \
+  -H "Authorization: Bearer DeepChat"
+
+# 聊天完成示例
+curl -X POST https://mockllm.anya2a.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer DeepChat" \
+  -d '{
+    "model": "mock-gpt-thinking",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'
+```
+
+### 方法 2：NPM 安装（本地部署）
 
 ```bash
 npm install -g mock-openai-api
@@ -310,10 +332,13 @@ docker run -p 3000:3000 mock-openai-api
 ### 使用 curl 测试
 
 ```bash
-# 测试健康检查
-curl http://localhost:3000/health
+# 测试公共服务
+curl https://mockllm.anya2a.com/health
+curl https://mockllm.anya2a.com/v1/models \
+  -H "Authorization: Bearer DeepChat"
 
-# 测试模型列表
+# 测试本地服务
+curl http://localhost:3000/health
 curl http://localhost:3000/v1/models
 
 # 测试思考型模型
@@ -365,7 +390,14 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```javascript
 import OpenAI from 'openai';
 
+// 使用公共服务
 const client = new OpenAI({
+  baseURL: 'https://mockllm.anya2a.com/v1',
+  apiKey: 'DeepChat'
+});
+
+// 或使用本地部署
+const localClient = new OpenAI({
   baseURL: 'http://localhost:3000/v1',
   apiKey: 'mock-key' // 可以是任意值
 });
