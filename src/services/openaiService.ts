@@ -672,8 +672,16 @@ export function* createChatCompletionStream(
  * 这个函数处理tool call执行后的第二阶段流式响应
  */
 export function* createToolCallResponseStream(
-  request: ChatCompletionRequest
+  request: ChatCompletionRequest,
+  toolMessageId: string,
+  toolMessageContent: string
 ): Generator<string, void, unknown> {
+  console.log(
+    "createToolCallResponseStream",
+    request,
+    toolMessageId,
+    toolMessageContent
+  );
   // Validate model
   const model = findModelById(request.model);
   if (!model || model.type !== "tool-calls") {
