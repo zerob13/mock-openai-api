@@ -1,6 +1,6 @@
 {
   "name": "mock-openai-api",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A mock OpenAI Compatible Provider API server",
   "keywords": [
     "openai",
@@ -35,7 +35,8 @@
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "cli": "ts-node src/cli.ts"
+    "cli": "ts-node src/cli.ts",
+    "lint": "npx -y oxlint src/**/*.ts"
   },
   "dependencies": {
     "commander": "^14.0.0",
