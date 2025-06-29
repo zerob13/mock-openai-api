@@ -17,6 +17,8 @@ app.listen(PORT, () => {
   console.log(`   • GET  /v1/models - Get model list`);
   console.log(`   • POST /v1/chat/completions - Chat completions`);
   console.log(`   • POST /v1/images/generations - Image generation`);
+  console.log(`   • POST /v1beta/models/gemini-pro:generateContent - Gemini completions`);
+  console.log(`   • POST /v1beta/models/gemini-2.0-flash:generateContent - Gemini completions`);
   console.log(`\n✨ Available models:`);
   console.log(`   - mock-gpt-thinking: Model supporting thought process`);
   console.log(`   - gpt-4-mock: Model supporting function calls with tool calls format`);

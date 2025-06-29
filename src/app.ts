@@ -37,7 +37,9 @@ app.get('/', (req, res) => {
       'GET /health',
       'GET /v1/models',
       'POST /v1/chat/completions',
-      'POST /v1/images/generations'
+      'POST /v1/images/generations',
+      'POST /v1beta/models/gemini-pro:generateContent',
+      'POST /v1beta/models/gemini-2.0-flash:generateContent'
     ]
   });
 });

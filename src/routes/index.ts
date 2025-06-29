@@ -5,6 +5,7 @@ import {
   handleImageGeneration,
   handleHealthCheck
 } from '../controllers/openaiController';
+import { handleGeminiRequest } from '../controllers/geminiController';
 
 const router = Router();
 
@@ -25,8 +26,7 @@ router.get('/models', handleGetModels);
 router.post('/v1/chat/completions', handleChatCompletion);
 router.post('/chat/completions', handleChatCompletion);
 
-// Compatible endpoints for different versions
-router.post('/v1/images/generations', handleImageGeneration);
-router.post('/images/generations', handleImageGeneration);
+router.post('/v1beta/models/gemini-pro:generateContent', handleGeminiRequest);
+router.post('/v1beta/models/gemini-2.0-flash:generateContent', handleGeminiRequest);
 
 export default router; 
