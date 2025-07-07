@@ -32,10 +32,10 @@ export function handleMessage(req: Request, res: Response){
     const request: MessagesRequest = req.body;
 
 		// Basic validation
-		if (!request.model || !request.messages) {
+		if (!request.model || !request.messages || !request.max_tokens) {
 			return res.status(400).json({
 				error: {
-					message: "Invalid request",
+					message: "Missing required fields: model, messages, or max_tokens",
 					type: "invalid_request_error",
 				},
 				type: "error"
