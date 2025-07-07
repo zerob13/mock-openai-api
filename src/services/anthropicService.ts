@@ -1,4 +1,4 @@
-import{ Model, ModelsResponse, MessagesRequest, MessagesResponse, Usage, MessageStartEvent, MessageDeltaEvent, MessageStopEvent,ContentBlockStartEvent, ContentBlockDeltaEvent} from '../types/anthropic';
+import{ Model, ModelsResponse, MessagesRequest, MessagesResponse, Usage, MessageStartEvent, MessageDeltaEvent, MessageStopEvent,ContentBlockStartEvent, ContentBlockDeltaEvent, ErrorResponse} from '../types/anthropic';
 
 import { anthropicMockModels } from '../data/anthropicMockData';
 import { getCurrentTimestamp, formatErrorResponse, calculateTokens, generateMessageId, findModelById, SSEMessageFormatter} from '../utils/anthropicHelpers';
@@ -24,7 +24,7 @@ export function getModels(): ModelsResponse {
 /**
  * Non-streaming response
  */
-export function createMessage(request: MessagesRequest): MessagesResponse{
+export function createMessage(request: MessagesRequest): MessagesResponse | ErrorResponse{
 	//Validate Model
 	const model = findModelById(request.model);
 	if(!model){

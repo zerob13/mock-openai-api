@@ -1,6 +1,6 @@
 import { MockModel } from "../types/index";
 import { anthropicMockModels } from "../data/anthropicMockData";
-import { StreamingEvent } from "../types/anthropic";
+import { ErrorResponse, StreamingEvent } from "../types/anthropic";
 
 /**
  * Get current timestamp
@@ -33,7 +33,7 @@ export function findModelById(modelId: string): MockModel | undefined {
 /**
  * Format error response
  */
-export function formatErrorResponse(message: string): any {
+export function formatErrorResponse(message: string): ErrorResponse {
   return {
     error: {
       message: message,

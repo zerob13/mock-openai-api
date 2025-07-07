@@ -109,6 +109,14 @@ export interface MessagesResponse{
 	container: Container | null;
 }
 
+export interface ErrorResponse{
+	error: {
+		message: string,
+		type: string,
+	},
+	type: "error"
+}
+
 export interface MessageStartEvent{
 	type: 'message_start';
 	message: MessagesResponse;

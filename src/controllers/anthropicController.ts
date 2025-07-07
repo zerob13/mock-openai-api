@@ -61,7 +61,7 @@ export function handleMessage(req: Request, res: Response){
 		const response = createMessage(request);
 
 		//Check if it's an error response
-		if ('error' in response) {
+		if (response.type === 'error') {
 			return res.status(400).json(response);
 		}
 
