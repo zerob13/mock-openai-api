@@ -14,12 +14,12 @@ export function getModels(): ModelsResponse {
 		display_name: mockModel.name
 	}));
 
-	return {
-		data: models,
-		first_id: models[0].id,
-		last_id: models[models.length - 1].id,
-		has_more: false
-	}
+	return {  
+		data: models,  
+		first_id: models.length > 0 ? models[0].id : null,  
+		last_id:  models.length > 0 ? models[models.length - 1].id : null,  
+		has_more: false  
+	}  
 }
 /**
  * Non-streaming response
@@ -85,7 +85,7 @@ export function createMessage(request: MessagesRequest): MessagesResponse | Erro
 /**
  * Streaming response
  */
-export function* createMessageStream(request: MessagesRequest): any {
+export function* createMessageStream(request: MessagesRequest): Generator<string, void, unknown> {
 	//validate model
 	const model = findModelById(request.model);
 	if(!model){

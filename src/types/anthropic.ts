@@ -19,7 +19,7 @@ export interface Message {
 	content: any; //temp
 }
 
-export interface MCP_Server{
+export interface MCPServer{
 	name:	string
   type: 'url';
 	url: string;
@@ -30,7 +30,7 @@ export interface MCP_Server{
 	};
 }
 
-export interface systemPrompt{
+export interface SystemPrompt{
 	text: string;
 	type: 'text';
 	cache_control?: {
@@ -57,14 +57,14 @@ export interface MessagesRequest {
 	messages: Message[];
 	max_tokens: number;
 	container?: string | null;
-	mcp_server?: MCP_Server;
+	mcp_server?: MCPServer;
 	metadata?: {
 		user_id?: string;
 	};
 	service_tier?: 'standard_only' | 'auto';
 	stop_sequence?: string[];
 	stream?: boolean;
-	system?: systemPrompt;
+	system?: SystemPrompt;
 	temperature?: number;
 	thinking?: Thinking;
 	tool_choice?: any;
@@ -85,7 +85,7 @@ export interface Usage{
 	server_tool_use: {
 		web_search_requests: number;
 	} | null;
-	service_tire: 'standard' | 'priority' | 'batch' | null;
+	service_tier: 'standard' | 'priority' | 'batch' | null;
 }
 
 export interface Container{
@@ -155,6 +155,10 @@ export interface ContentBlockDeltaEvent{
 		text: string;
 	}
 }
+
+export interface ContentBlockStopEvent { type: 'content_block_stop'; index: number; }  
+export interface PingEvent { type: 'ping'; }  
+export interface ErrorEvent { type: 'error'; error: string; }  
 
 
 export type StreamingEvent = 

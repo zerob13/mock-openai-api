@@ -13,7 +13,7 @@ export function getCurrentTimestamp(): number {
  * Generate message ID
  */
 export function generateMessageId(): string {
-  return `msg_${Math.random().toString(36).substr(2, 9)}`;
+  return `msg_${Math.random().toString(36).substring(2, 11)}`;  
 }
 
 /**
