@@ -65,7 +65,7 @@ export function createMessage(request: MessagesRequest): MessagesResponse | Erro
 		cache_creation_input_tokens: null,
 		cache_read_input_tokens: null,
 		server_tool_use: null,
-		service_tire: null
+		service_tier: null
 	};
 
 	const response: MessagesResponse = {
@@ -136,7 +136,7 @@ export function* createMessageStream(request: MessagesRequest): Generator<string
 				cache_creation_input_tokens: null,
 				cache_read_input_tokens: null,
 				server_tool_use: null,
-				service_tire: null
+				service_tier: null
 			},
 			container: null
 		}
