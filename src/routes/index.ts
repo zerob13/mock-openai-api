@@ -5,6 +5,10 @@ import {
   handleImageGeneration,
   handleHealthCheck,
 } from "../controllers/openaiController";
+import {
+  handleGetModels as handleGetAnthropicModels,
+  handleMessage as handleAnthropicMessage,
+} from "../controllers/anthropicController";
 
 const router: Router = Router();
 
@@ -26,6 +30,10 @@ router.get("/v1/models", handleGetModels as RequestHandler);
 router.get("/models", handleGetModels as RequestHandler);
 router.post("/v1/chat/completions", handleChatCompletion as RequestHandler);
 router.post("/chat/completions", handleChatCompletion as RequestHandler);
+
+// Anthropic API compatible endpoints
+router.get("/anthropic/v1/models", handleGetAnthropicModels as RequestHandler);
+router.post("/anthropic/v1/messages", handleAnthropicMessage as RequestHandler);
 
 // Compatible endpoints for different versions
 router.post("/v1/images/generations", handleImageGeneration as RequestHandler);
