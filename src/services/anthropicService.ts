@@ -142,22 +142,23 @@ export function* createMessageStream(request: MessagesRequest): Generator<string
 		}
 	}
 	yield SSEMessageFormatter('message_start', startChunk);
+	// Get test case
+	const testCase = model.testCases[0];
 
 	// Send the first chunk
-	outputTokens += calculateTokens(model.testCases[0].response);
 	const firstChunk: ContentBlockStartEvent = {
 		type: 'content_block_start',
 		index: 0,
 		content_block: {
 			type: 'text',
-			text: model.testCases[0].response
+			text: ""
 		}
 	}
 	yield SSEMessageFormatter('content_block_start', firstChunk);
 
 	//If there are predefined streaming chunks, use them
-	if(model.testCases[0].streamChunks && model.testCases[0].streamChunks.length > 0){
-		for(const chunk of model.testCases[0].streamChunks){
+	if(testCase.streamChunks && testCase.streamChunks.length > 0){
+		for(const chunk of testCase.streamChunks){
 			outputTokens += calculateTokens(chunk);
 			const streamChunk: ContentBlockDeltaEvent = {
 				type: 'content_block_delta',
@@ -169,7 +170,23 @@ export function* createMessageStream(request: MessagesRequest): Generator<string
 			}
 			yield SSEMessageFormatter('content_block_delta', streamChunk);
 		}
-	} 
+	} else{
+		// Split the response into chunks
+		const words = testCase.response.split(" ");
+		for(let i = 0; i < words.length; i += 2){
+			const chunkText = words.slice(i, i + 2).join(" ") + (i + 2 < words.length ? " " : "");
+			outputTokens += calculateTokens(chunkText);
+			const streamChunk: ContentBlockDeltaEvent = {
+				type: 'content_block_delta',
+				index: 0,
+				delta: {
+					type: 'text_delta',
+					text: chunkText
+				}
+			}
+			yield SSEMessageFormatter('content_block_delta', streamChunk);
+		}
+	}
 
 	//send message delta
 	const messageDelta: MessageDeltaEvent = {
