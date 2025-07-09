@@ -1,6 +1,6 @@
 {
   "name": "mock-openai-api",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A mock OpenAI Compatible Provider API server",
   "keywords": [
     "openai",
