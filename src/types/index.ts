@@ -164,6 +164,6 @@ export interface MockModel {
   id: string;
   name: string;
   description: string;
-  type: 'thinking' | 'markdown' | 'image' | 'thinking-tag' | 'tool-calls';
+  type: 'thinking' | 'markdown' | 'image' | 'thinking-tag' | 'tool-calls' | 'function';
   testCases: MockTestCase[];
 } 

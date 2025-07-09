@@ -12,7 +12,7 @@
 
 *[中文说明](README.zh.md) | English*
 
-A complete OpenAI API compatible mock server that returns predefined test data without calling real LLMs. Perfect for developing, testing, and debugging applications that use the OpenAI API.
+A complete **OpenAI, Anthropic, and Gemini API** compatible mock server that returns predefined test data without calling real LLMs. Perfect for developing, testing, and debugging applications that use these AI APIs.
 
 ## 🚀 Quick Start
 
@@ -205,6 +205,8 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ## 🎯 Features
 
 - ✅ **Full OpenAI API Compatibility**
+- ✅ **Anthropic Claude API Support**
+- ✅ **Google Gemini API Support**
 - ✅ **Support for streaming and non-streaming chat completions**
 - ✅ **Function calling support**
 - ✅ **Image generation support**
@@ -217,24 +219,31 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ## 📋 Supported API Endpoints
 
-### Model Management
+### OpenAI Compatible Endpoints
 - `GET /v1/models` - Get available model list
 - `GET /models` - Compatible endpoint
-
-### Chat Completions
 - `POST /v1/chat/completions` - Create chat completion
 - `POST /chat/completions` - Compatible endpoint
-
-### Image Generation
 - `POST /v1/images/generations` - Generate images
 - `POST /images/generations` - Compatible endpoint
+
+### Anthropic Compatible Endpoints
+- `GET /anthropic/v1/models` - Get Anthropic model list
+- `POST /anthropic/v1/messages` - Create message (Claude API)
+
+### Gemini Compatible Endpoints
+- `GET /v1beta/models` - Get Gemini model list
+- `POST /v1beta/models/{model}:generateContent` - Generate content
+- `POST /v1beta/models/{model}:streamGenerateContent` - Generate content (streaming)
 
 ### Health Check
 - `GET /health` - Server health status
 
 ## 🤖 Available Models
 
-### 1. mock-gpt-thinking
+### OpenAI Compatible Models
+
+#### 1. mock-gpt-thinking
 **Thinking Model** - Shows reasoning process, perfect for debugging logic
 
 ```json
@@ -246,7 +255,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 Response will include `<thinking>` tags showing the reasoning process.
 
-### 2. gpt-4-mock
+#### 2. gpt-4-mock
 **Function Calling Model** - Supports tools and function calling
 
 ```json
@@ -269,7 +278,7 @@ Response will include `<thinking>` tags showing the reasoning process.
 }
 ```
 
-### 3. mock-gpt-markdown
+#### 3. mock-gpt-markdown
 **Markdown Sample Model** - Outputs standard Markdown format plain text
 
 ```json
@@ -282,7 +291,7 @@ Response will include `<thinking>` tags showing the reasoning process.
 Response will be a complete Markdown document with various formatting elements, perfect for frontend UI debugging.
 **Note:** This model focuses on content display and doesn't support function calling to maintain output purity.
 
-### 4. gpt-4o-image
+#### 4. gpt-4o-image
 **Image Generation Model** - Specialized for image generation
 
 ```json
@@ -296,6 +305,45 @@ Response will be a complete Markdown document with various formatting elements, 
 ```
 
 Supports various sizes and quality settings, returns high-quality simulated images.
+
+### Anthropic Compatible Models
+
+#### 1. mock-claude-markdown
+**Claude Markdown Model** - Anthropic-compatible markdown generation
+
+```json
+{
+  "model": "mock-claude-markdown",
+  "messages": [{"role": "user", "content": "Hello"}],
+  "max_tokens": 1000
+}
+```
+
+### Gemini Compatible Models
+
+#### 1. gemini-1.5-pro
+**Advanced Multimodal Model** - Google's most advanced model
+
+```json
+{
+  "contents": [
+    {
+      "parts": [
+        {"text": "Explain quantum computing"}
+      ]
+    }
+  ]
+}
+```
+
+#### 2. gemini-1.5-flash
+**Fast Response Model** - Optimized for quick responses
+
+#### 3. gemini-pro
+**Versatile Model** - For various tasks including function calling
+
+#### 4. gemini-pro-vision
+**Multimodal Model** - Understands both text and images
 
 ## 🛠️ Development
 
@@ -441,17 +489,16 @@ docker run -p 3000:3000 my-mock-openai-api
 
 ### Testing with curl
 
-```bash
-# Test public service
-curl https://mockllm.anya2a.com/health
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
+#### OpenAI API Testing
 
-# Test local service
+```bash
+# Test OpenAI health check
 curl http://localhost:3000/health
+
+# Test OpenAI models
 curl http://localhost:3000/v1/models
 
-# Test thinking model
+# Test OpenAI thinking model
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -459,7 +506,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
     "messages": [{"role": "user", "content": "Explain recursion"}]
   }'
 
-# Test function calling
+# Test OpenAI function calling
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -467,7 +514,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
     "messages": [{"role": "user", "content": "What time is it now?"}]
   }'
 
-# Test Markdown output
+# Test OpenAI markdown output
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -475,7 +522,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
     "messages": [{"role": "user", "content": "Any content"}]
   }'
 
-# Test streaming output
+# Test OpenAI streaming
 curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -484,7 +531,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
     "stream": true
   }'
 
-# Test image generation
+# Test OpenAI image generation
 curl -X POST http://localhost:3000/v1/images/generations \
   -H "Content-Type: application/json" \
   -d '{
@@ -493,6 +540,102 @@ curl -X POST http://localhost:3000/v1/images/generations \
     "n": 2,
     "size": "1024x1024"
   }'
+```
+
+#### Anthropic API Testing
+
+```bash
+# Test Anthropic models
+curl http://localhost:3000/anthropic/v1/models
+
+# Test Anthropic messages
+curl -X POST http://localhost:3000/anthropic/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "mock-claude-markdown",
+    "messages": [{"role": "user", "content": "Hello Claude"}],
+    "max_tokens": 1000
+  }'
+
+# Test Anthropic streaming
+curl -X POST http://localhost:3000/anthropic/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "mock-claude-markdown",
+    "messages": [{"role": "user", "content": "Tell me about AI"}],
+    "max_tokens": 1000,
+    "stream": true
+  }'
+```
+
+#### Gemini API Testing
+
+```bash
+# Test Gemini models
+curl http://localhost:3000/v1beta/models
+
+# Test Gemini content generation (matching official API format)
+curl -X POST http://localhost:3000/v1beta/models/gemini-1.5-pro:generateContent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "Explain how AI works in a few words"
+          }
+        ]
+      }
+    ],
+    "generationConfig": {
+      "thinkingConfig": {
+        "thinkingBudget": 0
+      }
+    }
+  }'
+
+# Test Gemini streaming
+curl -X POST http://localhost:3000/v1beta/models/gemini-1.5-flash:streamGenerateContent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "Write a short story about a robot"
+          }
+        ]
+      }
+    ]
+  }'
+
+# Test different Gemini model
+curl -X POST http://localhost:3000/v1beta/models/gemini-pro:generateContent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "What are the benefits of renewable energy?"
+          }
+        ]
+      }
+    ],
+    "generationConfig": {
+      "temperature": 0.7,
+      "maxOutputTokens": 1000
+    }
+  }'
+```
+
+#### Public Service Testing
+
+```bash
+# Test public service
+curl https://mockllm.anya2a.com/health
+curl https://mockllm.anya2a.com/v1/models \
+  -H "Authorization: Bearer DeepChat"
 ```
 
 ### Testing with OpenAI SDK

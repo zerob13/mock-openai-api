@@ -17,11 +17,12 @@ app.use(express.urlencoded({ extended: true }));
 // Request logging middleware (conditional)
 app.use((req, res, next) => {
   if (global.verboseLogging) {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-    console.log(`Original URL: ${req.originalUrl}`);
-    console.log(`Base URL: ${req.baseUrl}`);
+    console.log(`🌐 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+    console.log(`🔗 Original URL: ${req.originalUrl}`);
+    console.log(`🔗 Base URL: ${req.baseUrl}`);
+    console.log(`🔗 Headers:`, JSON.stringify(req.headers, null, 2));
     if (req.body && Object.keys(req.body).length > 0) {
-      console.log("Request body:", JSON.stringify(req.body, null, 2));
+      console.log("📄 Request body:", JSON.stringify(req.body, null, 2));
     }
   }
   next();
@@ -38,6 +39,11 @@ app.get("/", (req, res) => {
       "GET /v1/models",
       "POST /v1/chat/completions",
       "POST /v1/images/generations",
+      "GET /anthropic/v1/models",
+      "POST /anthropic/v1/messages",
+      "GET /v1beta/models",
+      "POST /v1beta/models/{model}:generateContent",
+      "POST /v1beta/models/{model}:streamGenerateContent",
     ],
   });
 });
@@ -47,11 +53,20 @@ app.use("/", routes);
 
 // 404 handler
 app.use((req, res) => {
-  if (global.verboseLogging) {
-    console.log(`404 - Path not found: ${req.originalUrl}`);
-    console.log(`Method: ${req.method}`);
-    console.log(`Headers:`, req.headers);
-  }
+  console.log(`❌ 404 - Path not found: ${req.originalUrl}`);
+  console.log(`❌ Method: ${req.method}`);
+  console.log(`❌ Headers:`, JSON.stringify(req.headers, null, 2));
+  console.log(`❌ Available routes:`);
+  console.log(`   - GET /health`);
+  console.log(`   - GET /v1/models`);
+  console.log(`   - POST /v1/chat/completions`);
+  console.log(`   - POST /v1/images/generations`);
+  console.log(`   - GET /anthropic/v1/models`);
+  console.log(`   - POST /anthropic/v1/messages`);
+  console.log(`   - GET /v1beta/models`);
+  console.log(`   - POST /v1beta/models/{model}:generateContent`);
+  console.log(`   - POST /v1beta/models/{model}:streamGenerateContent`);
+  
   res.status(404).json({
     error: {
       message: `Path not found: ${req.originalUrl}`,
@@ -60,6 +75,17 @@ app.use((req, res) => {
       method: req.method,
       path: req.path,
       originalUrl: req.originalUrl,
+      availableEndpoints: [
+        "GET /health",
+        "GET /v1/models",
+        "POST /v1/chat/completions",
+        "POST /v1/images/generations",
+        "GET /anthropic/v1/models",
+        "POST /anthropic/v1/messages",
+        "GET /v1beta/models",
+        "POST /v1beta/models/{model}:generateContent",
+        "POST /v1beta/models/{model}:streamGenerateContent",
+      ],
     },
   });
 });
