@@ -1,108 +1,168 @@
 import { MockModel, MockTestCase } from '../types';
-
+import { ImgData } from './base64Img';
 // Thinking model test cases
 export const thinkingTestCases: MockTestCase[] = [
+//   {
+//     name: "Math Problem",
+//     description: "Solve complex math problems",
+//     prompt: "Calculate 2+2",
+//     reasoning_content: "This is a simple addition problem. I need to calculate 2 + 2. 2 + 2 = 4. This is basic arithmetic.",
+//     reasoning_chunks: [
+//       "This is a simple",
+//       " addition problem.",
+//       " I need to calculate",
+//       " 2 + 2.",
+//       " 2 + 2 = 4.",
+//       " This is basic",
+//       " arithmetic."
+//     ],
+//     response: "2 + 2 = 4\n\nThis is a basic addition operation.",
+//     streamChunks: [
+//       "2 + 2 = 4",
+//       "\n\nThis is a",
+//       " basic",
+//       " addition operation."
+//     ]
+//   },
+//   {
+//     name: "Programming Question",
+//     description: "Code problem solving",
+//     prompt: "How to create a list in Python?",
+//     reasoning_content: "The user is asking how to create a list in Python. This is a basic Python question. There are several ways to create lists in Python: 1. Using square brackets [] 2. Using the list() constructor 3. Using list comprehension. I should provide clear examples.",
+//     reasoning_chunks: [
+//       "The user is asking how to",
+//       " create a list in Python.",
+//       " This is a basic",
+//       " Python question.",
+//       " There are several ways",
+//       " to create lists:",
+//       " 1. Using square brackets []",
+//       " 2. Using the list()",
+//       " constructor",
+//       " 3. Using list comprehension.",
+//       " I should provide",
+//       " clear examples."
+//     ],
+//     response: `There are several ways to create lists in Python:
+
+// 1. **Empty list**:
+//    \`\`\`python
+//    my_list = []
+//    \`\`\`
+
+// 2. **List with initial values**:
+//    \`\`\`python
+//    my_list = [1, 2, 3, 4, 5]
+//    \`\`\`
+
+// 3. **Using list() constructor**:
+//    \`\`\`python
+//    my_list = list()
+//    \`\`\`
+
+// 4. **List comprehension**:
+//    \`\`\`python
+//    my_list = [x for x in range(10)]
+//    \`\`\``,
+//     streamChunks: [
+//       "There are several ways to create lists",
+//       " in Python:\n\n",
+//       "1. **Empty list**:\n   ```python\n",
+//       "   my_list = []\n   ```\n\n",
+//       "2. **List with initial values**:\n",
+//       "   ```python\n   my_list = [1, 2, 3, 4, 5]\n",
+//       "   ```\n\n3. **Using list() constructor**:\n",
+//       "   ```python\n   my_list = list()\n",
+//       "   ```\n\n4. **List comprehension**:\n",
+//       "   ```python\n   my_list = [x for x in range(10)]\n",
+//       "   ```"
+//     ]
+//   },
+//   {
+//     name: "Default Reply",
+//     description: "General friendly response",
+//     prompt: "Hello",
+//     reasoning_content: "We are having a conversation with the user, and the user just said: \"Hello\". Based on the conversation history, we need to give a friendly response. Since the user is just greeting, we don't need to call any functions, we can reply directly.",
+//     reasoning_chunks: [
+//       "We are having a",
+//       " conversation with the user,",
+//       " and the user just said:",
+//       " \"Hello\".",
+//       " Based on the conversation history,",
+//       " we need to give",
+//       " a friendly response.",
+//       " Since the user is just",
+//       " greeting, we don't",
+//       " need to call any",
+//       " functions, we can reply",
+//       " directly."
+//     ],
+//     response: "Hello! How can I help you today? 😊",
+//     streamChunks: [
+//       "Hello!",
+//       " How can I",
+//       " help you today?",
+//       " 😊"
+//     ]
+//   },
   {
-    name: "Math Problem",
-    description: "Solve complex math problems",
-    prompt: "Calculate 2+2",
-    reasoning_content: "This is a simple addition problem. I need to calculate 2 + 2. 2 + 2 = 4. This is basic arithmetic.",
+    name: "Base64 Image Display",
+    description: "Display base64 encoded image in markdown format",
+    prompt: "Show me a sample image",
+    reasoning_content: "The user is asking to see a sample image. I need to display an image using base64 data URL format in markdown. This will demonstrate how to properly embed base64 encoded images in markdown content. I should provide a clear explanation of what the image contains and use proper markdown syntax.",
     reasoning_chunks: [
-      "This is a simple",
-      " addition problem.",
-      " I need to calculate",
-      " 2 + 2.",
-      " 2 + 2 = 4.",
-      " This is basic",
-      " arithmetic."
-    ],
-    response: "2 + 2 = 4\n\nThis is a basic addition operation.",
-    streamChunks: [
-      "2 + 2 = 4",
-      "\n\nThis is a",
-      " basic",
-      " addition operation."
-    ]
-  },
-  {
-    name: "Programming Question",
-    description: "Code problem solving",
-    prompt: "How to create a list in Python?",
-    reasoning_content: "The user is asking how to create a list in Python. This is a basic Python question. There are several ways to create lists in Python: 1. Using square brackets [] 2. Using the list() constructor 3. Using list comprehension. I should provide clear examples.",
-    reasoning_chunks: [
-      "The user is asking how to",
-      " create a list in Python.",
-      " This is a basic",
-      " Python question.",
-      " There are several ways",
-      " to create lists:",
-      " 1. Using square brackets []",
-      " 2. Using the list()",
-      " constructor",
-      " 3. Using list comprehension.",
+      "The user is asking",
+      " to see a sample image.",
+      " I need to display",
+      " an image using",
+      " base64 data URL format",
+      " in markdown.",
+      " This will demonstrate",
+      " how to properly embed",
+      " base64 encoded images",
+      " in markdown content.",
       " I should provide",
-      " clear examples."
+      " a clear explanation",
+      " of what the image contains",
+      " and use proper",
+      " markdown syntax."
     ],
-    response: `There are several ways to create lists in Python:
+    response: `Here's a sample image displayed using base64 encoding:
 
-1. **Empty list**:
-   \`\`\`python
-   my_list = []
-   \`\`\`
+![Sample Base64 Image](${ImgData})
 
-2. **List with initial values**:
-   \`\`\`python
-   my_list = [1, 2, 3, 4, 5]
-   \`\`\`
+This demonstrates how to embed base64-encoded images directly in markdown. The image is encoded as a data URL, which allows it to be displayed without requiring an external file reference.
 
-3. **Using list() constructor**:
-   \`\`\`python
-   my_list = list()
-   \`\`\`
+Key benefits of base64 image embedding:
+- **Self-contained**: No external dependencies
+- **Immediate display**: No network requests needed
+- **Portable**: Can be shared as plain text
 
-4. **List comprehension**:
-   \`\`\`python
-   my_list = [x for x in range(10)]
-   \`\`\``,
+Note: Base64 encoding increases file size by approximately 33%, so it's best used for small images or when external hosting isn't available.`,
     streamChunks: [
-      "There are several ways to create lists",
-      " in Python:\n\n",
-      "1. **Empty list**:\n   ```python\n",
-      "   my_list = []\n   ```\n\n",
-      "2. **List with initial values**:\n",
-      "   ```python\n   my_list = [1, 2, 3, 4, 5]\n",
-      "   ```\n\n3. **Using list() constructor**:\n",
-      "   ```python\n   my_list = list()\n",
-      "   ```\n\n4. **List comprehension**:\n",
-      "   ```python\n   my_list = [x for x in range(10)]\n",
-      "   ```"
-    ]
-  },
-  {
-    name: "Default Reply",
-    description: "General friendly response",
-    prompt: "Hello",
-    reasoning_content: "We are having a conversation with the user, and the user just said: \"Hello\". Based on the conversation history, we need to give a friendly response. Since the user is just greeting, we don't need to call any functions, we can reply directly.",
-    reasoning_chunks: [
-      "We are having a",
-      " conversation with the user,",
-      " and the user just said:",
-      " \"Hello\".",
-      " Based on the conversation history,",
-      " we need to give",
-      " a friendly response.",
-      " Since the user is just",
-      " greeting, we don't",
-      " need to call any",
-      " functions, we can reply",
-      " directly."
-    ],
-    response: "Hello! How can I help you today? 😊",
-    streamChunks: [
-      "Hello!",
-      " How can I",
-      " help you today?",
-      " 😊"
+      "Here's a sample image displayed",
+      " using base64 encoding:\n\n",
+      `![Sample Base64 Image](${ImgData} "Sample Base64 Image")\n\n`,
+      "This demonstrates how to embed",
+      " base64-encoded images directly",
+      " in markdown. The image is encoded",
+      " as a data URL, which allows",
+      " it to be displayed without",
+      " requiring an external",
+      " file reference.\n\n",
+      "Key benefits of base64",
+      " image embedding:\n",
+      "- **Self-contained**: No external",
+      " dependencies\n",
+      "- **Immediate display**: No network",
+      " requests needed\n",
+      "- **Portable**: Can be shared",
+      " as plain text\n\n",
+      "Note: Base64 encoding increases",
+      " file size by approximately 33%,",
+      " so it's best used for small",
+      " images or when external hosting",
+      " isn't available."
     ]
   }
 ];
@@ -946,6 +1006,134 @@ Creating an HTML artifact to display mock weather data for Shanghai is substanti
       "<a href=\"https://github.com/ThinkInAIXYZ/deepchat\">DeepChat</a>",
       " | All page content is AI-generated and for reference only\n        </footer>\n",
       "    </div>\n</body>\n</html>\n</antArtifact>"
+    ]
+  },
+  {
+    name: "Base64 Image Markdown",
+    description: "Markdown with embedded base64 images",
+    prompt: "Show me how to embed base64 images in markdown",
+    response: `# Base64 Image Embedding in Markdown
+
+This document demonstrates how to embed base64-encoded images directly in markdown content.
+
+## Sample Base64 Image
+
+Here's an example of a base64-encoded image embedded in markdown:
+
+![Base64 Sample](${ImgData})
+
+## Key Features
+
+### Self-Contained Content
+- **No external dependencies**: The image data is embedded directly in the markdown
+- **Portable**: Can be shared as a single text file
+- **Immediate rendering**: No network requests required
+
+### Technical Details
+
+#### Data URL Format
+\`\`\`
+data:image/[type];base64,[data]
+\`\`\`
+
+Where:
+- \`[type]\` is the image MIME type (png, jpeg, gif, etc.)
+- \`[data]\` is the base64-encoded image data
+
+#### Usage Examples
+
+**Basic syntax:**
+\`\`\`markdown
+![Alt text](data:image/png;base64,iVBORw0KGgo...)
+\`\`\`
+
+**With title:**
+\`\`\`markdown
+![Alt text](data:image/png;base64,iVBORw0KGgo... "Image Title")
+\`\`\`
+
+### Advantages & Disadvantages
+
+| Advantages | Disadvantages |
+|------------|---------------|
+| ✅ Self-contained | ❌ Larger file size (+33%) |
+| ✅ No broken links | ❌ Not cacheable |
+| ✅ Works offline | ❌ Harder to maintain |
+| ✅ Secure (no external requests) | ❌ Not SEO-friendly |
+
+## Best Practices
+
+1. **Use for small images** (< 50KB recommended)
+2. **Consider compression** before encoding
+3. **Optimize image format** (WebP > PNG > JPEG)
+4. **Add meaningful alt text** for accessibility
+
+## Multiple Image Examples
+
+Here are different types of base64 images:
+
+### Icon Example
+![Sample Icon](${ImgData})
+
+### Inline Usage
+You can also use base64 images inline ![inline](${ImgData}) within text.
+
+---
+
+*Note: Base64 encoding is best suited for small images, icons, or when external hosting is not available.*`,
+    streamChunks: [
+      "# Base64 Image Embedding in Markdown\n\n",
+      "This document demonstrates how to embed",
+      " base64-encoded images directly",
+      " in markdown content.\n\n",
+      "## Sample Base64 Image\n\n",
+      "Here's an example of a base64-encoded",
+      " image embedded in markdown:\n\n",
+      `![Base64 Sample](${ImgData})\n\n`,
+      "## Key Features\n\n",
+      "### Self-Contained Content\n",
+      "- **No external dependencies**: The image",
+      " data is embedded directly in the markdown\n",
+      "- **Portable**: Can be shared as",
+      " a single text file\n",
+      "- **Immediate rendering**: No network",
+      " requests required\n\n",
+      "### Technical Details\n\n",
+      "#### Data URL Format\n```\n",
+      "data:image/[type];base64,[data]\n```\n\n",
+      "Where:\n- `[type]` is the image MIME type",
+      " (png, jpeg, gif, etc.)\n",
+      "- `[data]` is the base64-encoded",
+      " image data\n\n",
+      "#### Usage Examples\n\n",
+      "**Basic syntax:**\n```markdown\n",
+      "![Alt text](data:image/png;base64,iVBORw0KGgo...)\n",
+      "```\n\n**With title:**\n```markdown\n",
+      "![Alt text](data:image/png;base64,iVBORw0KGgo...",
+      " \"Image Title\")\n```\n\n",
+      "### Advantages & Disadvantages\n\n",
+      "| Advantages | Disadvantages |\n",
+      "|------------|---------------|\n",
+      "| ✅ Self-contained | ❌ Larger file size (+33%) |\n",
+      "| ✅ No broken links | ❌ Not cacheable |\n",
+      "| ✅ Works offline | ❌ Harder to maintain |\n",
+      "| ✅ Secure (no external requests) | ❌ Not SEO-friendly |\n\n",
+      "## Best Practices\n\n",
+      "1. **Use for small images** (< 50KB recommended)\n",
+      "2. **Consider compression** before encoding\n",
+      "3. **Optimize image format** (WebP > PNG > JPEG)\n",
+      "4. **Add meaningful alt text** for accessibility\n\n",
+      "## Multiple Image Examples\n\n",
+      "Here are different types of base64 images:\n\n",
+      "### Icon Example\n",
+      `![Sample Icon](${ImgData})\n\n`,
+      "### Inline Usage\n",
+      "You can also use base64 images inline ",
+      `![inline](${ImgData})`,
+      " within text.\n\n---\n\n",
+      "*Note: Base64 encoding is best suited",
+      " for small images, icons, or when",
+      " external hosting is not available.*"
     ]
   }
 

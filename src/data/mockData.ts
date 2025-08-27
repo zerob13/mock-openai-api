@@ -1,5 +1,6 @@
 import { MockModel, MockTestCase } from '../types';
 import { thinkingTestCases, functionTestCases, markdownTestCases } from './testCases';
+import { ImgData } from './base64Img';
 
 
 // Predefined model list
@@ -52,5 +53,6 @@ export const mockImageUrls = [
   "https://placehold.co/1024x1024/4ECDC4/FFFFFF?text=Mock+Image+2",
   "https://placehold.co/1024x1024/45B7D1/FFFFFF?text=Mock+Image+3",
   "https://placehold.co/1024x1024/96CEB4/FFFFFF?text=Mock+Image+4",
-  "https://placehold.co/1024x1024/FFEAA7/000000?text=Mock+Image+5"
+  "https://placehold.co/1024x1024/FFEAA7/000000?text=Mock+Image+5",
+  ImgData
 ]; 

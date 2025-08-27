@@ -18,6 +18,7 @@ import {
   randomChoice,
   formatErrorResponse,
 } from "../utils/helpers";
+import { ImgData } from "../data/base64Img";
 /**
  * Get model list
  */
@@ -848,14 +849,7 @@ export function generateImage(
   // If gpt-4o-image model is specified, use higher quality placeholder images
   if (model === "gpt-4o-image") {
     imageUrls = [
-      `https://placehold.co/${size}/FF6B6B/FFFFFF?text=GPT-4O+Image+1`,
-      `https://placehold.co/${size}/4ECDC4/FFFFFF?text=GPT-4O+Image+2`,
-      `https://placehold.co/${size}/45B7D1/FFFFFF?text=GPT-4O+Image+3`,
-      `https://placehold.co/${size}/96CEB4/FFFFFF?text=GPT-4O+Image+4`,
-      `https://placehold.co/${size}/FFEAA7/000000?text=GPT-4O+Image+5`,
-      `https://placehold.co/${size}/DDA0DD/000000?text=GPT-4O+Image+6`,
-      `https://placehold.co/${size}/F0E68C/000000?text=GPT-4O+Image+7`,
-      `https://placehold.co/${size}/FFA07A/000000?text=GPT-4O+Image+8`,
+      ImgData
     ];
   }
 
@@ -865,8 +859,7 @@ export function generateImage(
     if (request.response_format === "b64_json") {
       // Simulate base64 encoded image (in actual applications this would be real base64)
       return {
-        b64_json:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAB6BJREFUeF7t3HmITW8YB/DnWsYfGtsITQ1/WUJSJFmKImtKiSgRTbIVprElyx/+nIhkyZJ9KyWyb8kMchMp2S+DCRkJWSbcX9/n173u3Dn3zLnnvOu95y01555z3/c9z+d9n+fcwY1Eo9F4UVERFRQUUNj0RaCuro5qa2spEovF4vihW7duVFhYqG9GeTzy169f6cmTJ4SNEXn79m0cEHghRFG/KhIYiD1+ZpDi4mI+CFHUgqTHvKam5h8IphKiqANxinUDkBBFDUimhe8IEqLIRXHLQhlBQhQ5KI2VBFeQEEUsSmMYGK1RkBBFDIoXDM8gIUowFK8YWYGEKP5QssHIGiREyQ4lWwxfICGKNxQ/GL5BQhR3FL8YgUBCFGeUIBiBQUKU+ihBMYSAhCj/o4jAEAYickLeSqZZV4nCEAqSrygiMYSD5BuKaAwpIPmCIgNDGkiuo8jCkAqSqygyMaSD5BqKbAwlILmCogJDGYjtKKowlILYiqISQzmIbSiqMbSA2IKiA0MbiOkoujC0gpiKohNDO4hpKLoxjAAxBcUEDGNAdKOYgmEUiC4UkzCMA1GNYhqGkSCqUEzEMBZENoqpGEaDyEIxGcN4ENEopmNYASIKxQYMa0CCotiCYRWIXxSbMKwDyRbFNgwrQbyi2IhhLUhjKLZiWA2SCcVmDOtB0lFwbPuX53j6f+q4UZNbYldgjrZ/vVQIYthKsx4ktWaEKUvz6nIq4GFR14TiFnibUaxMWV4C7uUaTWvJdVjrQLIJdDbXmoJjFYifAPt5j04ca0CCBDbIe1XjWAEiIqAi+lCBYzyIyECK7EsWjtEgMgIoo0+ROMaCyAyczL6D4hgJoiJgKsbwg2MciMpAqRzLK45RIDoCpGNMNxxjQHQGRufY6ThGgJgQEBPmYMRf4ZoSiMb+4YTXGhD0Oq07xCSMRCB1z0kbiO4bd1vJOuemBUTnDXtNKbrmqBxE1416hUi9TsdclYLouEE/EDpRlIHYiKGj0CsBsRlDNYp0kFzAUIkiFSSXMFShSAPJRQwVKFJAchlDNopwkHzAkIkiFCSfMGShCAPJRwwZKEJA8hlDNEpgkBDj3y9aRMQiEIiICQT9XZNp7w8aE98gQQc2LZAi5xMkNr5Aggwo8sZN7stvjLIG8TuQycGTNTc/scoKxM8Asm42U7+fPn2ib9++UefOnRtc8uzZM2rXrh3/SW/v37+nnz9/UpcuXbKa8q9fv+j58+fUs2dPxz5ra2vpx48fDf679vfv36m6upq6du1KTZs2Tb7XM4gNGLirOXPmMMjBgweTN4kbHzlyJH+pANrMmTNp165d1KRJE/r9+zdNmjSJTp48yef69OlDV69edURzkjp8+DCP+eXLl+Tp9D579+5NmzZtov79+1NhYSGtX7+eVq1axdfjGOP169ePjz2B2IBx5MgROnHiBB0/fpymTZtWD2TChAn07t07Po/VPGzYMNq2bRsHcuPGjbR69Wq6fPkytW/fnkaPHk19+/alo0ePuu6UW7du0d69e5PjpII49QmUlStX8mLB+Hv27KExY8bQkiVL6NKlS/TmzRtq3rx54yA2YCByy5Yto5cvX9K1a9doxIgRyUB9+PCBOnbsSBcvXuTX0SZPnsxA169fp169evEOWbduHZ/bunUrzZs3j5D6ZsyYwSls8+bNfG7u3LmcfhDMAwcO0OnTp+nRo0cUi8Xq7ZBMfWJMALx48YJu3rzJfT548IB35ZUrV2j48OHuILZgpC7lKVOmULNmzZIgVVVVNHjwYPr8+TO1bt2aL12zZg1t2LCBg45VeebMGV6taFitSG8INGrO+PHj6dixY4RaMX36dLp9+zYNGDAgOSR22tKlS5MgSFdufQK7pKSEkZGuUEtatmxJO3fupNmzZ2cGsREDUUoHQY5HCvv79y9FIhEOJFb4rFmz6NWrV7wDKisradCgQXzu6dOnXIDv3LnDOX/+/Pm0f/9+PoeUs3z58nqpLB0E9cqtz4kTJ1JpaSmNGzcuWeixg9Hv4sWLnUFsxXACSeyQjx8/UlFREQdzy5YttHv3bk4bLVq04IKOOoN2//59riHYPW3btqVEysNqRh8FBQWuIHV1da59Tp06ldPk2rVrk99c1KpVK05/QGpQ1G3GcAJJpITUVINa8OfPH9qxYwcNGTKEsGrLyso40Hg4KC8vp9evX/PxwoULuXgjLhUVFVwDUlv6DsE5tz4BEY1GGQB93rhxg8aOHcv1DzurHojtGE4geA05v1OnThzYc+fOcQo7dOgQYbWuWLGCdwvAUHSRxxHQ7du387WoLQjew4cPuVZgB6EIJ5oTiFufZ8+eZYDz589T9+7dGfzu3bvcP3ZKEgRb0vYv/0qAIK0k8j5ew83iCQbpB23BggXJJyc8riJAqCNoAwcOpAsXLvDnkx49etCoUaNo3759fDx06FAu3vfu3ePCjQY47KjUx95MfSLG8XicFi1axJ9L0Dp06ECnTp3iD4eoXdgUkVgsFscnStu//KteLkk7QIp6/PgxFRcXU5s2bRpcigKPD4p4AhLV3PpEjcJvB4COh41EdkKdi0Sj0Th+SC9YoiYW9uMtAnggwMb4D6b4LCpJtO3XAAAAAElFTkSuQmCC",
+        b64_json:ImgData
       };
     } else {
       return {
