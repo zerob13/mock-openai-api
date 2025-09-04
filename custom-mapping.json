@@ -1,0 +1,11 @@
+{
+  "mock-gpt-thinking": "custom-gpt-mini",
+  "gpt-4-mock": "custom-gpt-pro",
+  "mock-gpt-markdown": "custom-gpt-markdown",
+  "gpt-4o-image": "custom-dalle",
+  "mock-claude-markdown": "custom-claude-pro",
+  "gemini-1.5-pro": "custom-gemini-pro",
+  "gemini-1.5-flash": "custom-gemini-flash",
+  "gemini-pro": "custom-gemini-basic",
+  "gemini-pro-vision": "custom-gemini-vision"
+}

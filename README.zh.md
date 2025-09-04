@@ -326,6 +326,37 @@ docker run -p 3000:3000 mock-openai-api
 
 - `PORT` - 服务器端口（默认：3000）
 - `HOST` - 服务器主机（默认：0.0.0.0）
+- `MODEL_MAPPING_CONFIG` - 模型映射配置文件路径（默认：model-mapping.json）
+
+### 模型映射配置
+
+您可以通过创建 `model-mapping.json` 文件来自定义显示给用户的模型名称。这允许您将内部模型名称映射到外部名称，以提供更好的用户体验。
+
+**示例 model-mapping.json:**
+```json
+{
+  "mock-gpt-thinking": "gpt-4o-mini",
+  "gpt-4-mock": "gpt-4-turbo",
+  "mock-gpt-markdown": "gpt-4o",
+  "gpt-4o-image": "dall-e-3",
+  "mock-claude-markdown": "claude-3-opus-20240229",
+  "gemini-1.5-pro": "gemini-2.0-pro-exp-2025-01-15",
+  "gemini-1.5-flash": "gemini-2.0-flash-exp-2025-01-15",
+  "gemini-pro": "gemini-pro-1.0",
+  "gemini-pro-vision": "gemini-pro-vision-1.0"
+}
+```
+
+**CLI 使用:**
+```bash
+# 使用自定义模型映射配置
+npx mock-openai-api -c custom-mapping.json
+
+# 或通过环境变量设置
+MODEL_MAPPING_CONFIG=custom-mapping.json npx mock-openai-api
+```
+
+服务器将自动加载配置并在控制台输出和 API 响应中显示映射后的模型名称。
 
 ## 🧪 测试
 
