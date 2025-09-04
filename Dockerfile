@@ -1,8 +1,7 @@
 # Build stage
 FROM node:22-alpine3.21
 
-
-# Install pages
+# Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init==1.2.5-r3
 
 WORKDIR /app
