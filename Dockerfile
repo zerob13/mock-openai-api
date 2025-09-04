@@ -1,5 +1,8 @@
 # Build stage
-FROM node:22-alpine
+FROM node:22-alpine3.21
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init==1.2.5-r3
 
 WORKDIR /app
 
@@ -24,6 +27,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 ENV VERBOSE=true
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
 # Start the application with verbose logging enabled
 CMD ["node", "dist/index.js"]
