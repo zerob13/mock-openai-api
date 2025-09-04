@@ -484,6 +484,37 @@ docker run -p 3000:3000 my-mock-openai-api
 - `PORT` - Server port (default: 3000)
 - `HOST` - Server host (default: 0.0.0.0)
 - `VERBOSE` - Enable verbose logging (default: false)
+- `MODEL_MAPPING_CONFIG` - Path to model mapping configuration file (default: model-mapping.json)
+
+### Model Mapping Configuration
+
+You can customize the model names displayed to users by creating a `model-mapping.json` file. This allows you to map internal model names to external names for better user experience.
+
+**Example model-mapping.json:**
+```json
+{
+  "mock-gpt-thinking": "gpt-4o-mini",
+  "gpt-4-mock": "gpt-4-turbo",
+  "mock-gpt-markdown": "gpt-4o",
+  "gpt-4o-image": "dall-e-3",
+  "mock-claude-markdown": "claude-3-opus-20240229",
+  "gemini-1.5-pro": "gemini-2.0-pro-exp-2025-01-15",
+  "gemini-1.5-flash": "gemini-2.0-flash-exp-2025-01-15",
+  "gemini-pro": "gemini-pro-1.0",
+  "gemini-pro-vision": "gemini-pro-vision-1.0"
+}
+```
+
+**CLI Usage:**
+```bash
+# Use custom model mapping configuration
+npx mock-openai-api -c custom-mapping.json
+
+# Or set via environment variable
+MODEL_MAPPING_CONFIG=custom-mapping.json npx mock-openai-api
+```
+
+The server will automatically load the configuration and display mapped model names in the console output and API responses.
 
 ## 🧪 Testing
 

@@ -1,6 +1,7 @@
 import { MockModel } from "../types/index";
 import { anthropicMockModels } from "../data/anthropicMockData";
 import { ErrorResponse, StreamingEvent } from "../types/anthropic";
+import { getMappedModelName } from "../config/modelMapping";
 
 /**
  * Get current timestamp
@@ -27,7 +28,8 @@ export function calculateTokens(text: string): number {
  * Find model by ID
  */
 export function findModelById(modelId: string): MockModel | undefined {
-  return anthropicMockModels.find(model => model.id === modelId);
+  const mappedModelId = getMappedModelName(modelId);
+  return anthropicMockModels.find(model => model.id === mappedModelId);
 }
 
 /**

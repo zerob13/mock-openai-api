@@ -18,13 +18,14 @@ import {
   randomChoice,
   formatErrorResponse,
 } from "../utils/helpers";
+import { getMappedModelName } from "../config/modelMapping";
 import { ImgData } from "../data/base64Img";
 /**
  * Get model list
  */
 export function getModels(): ModelsResponse {
   const models: Model[] = mockModels.map((mockModel) => ({
-    id: mockModel.id,
+    id: getMappedModelName(mockModel.id),
     object: "model",
     created: getCurrentTimestamp(),
     owned_by: "mock-openai",

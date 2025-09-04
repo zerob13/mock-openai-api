@@ -1,4 +1,5 @@
 import { geminiMockModels } from '../data/geminiMockData';
+import { getMappedModelName } from '../config/modelMapping';
 
 /**
  * Get current timestamp
@@ -29,7 +30,8 @@ export function generateModelName(): string {
 export function findGeminiModelById(modelId: string) {
   // Remove 'models/' prefix if present
   const cleanModelId = modelId.replace('models/', '');
-  return geminiMockModels.find(model => model.id === cleanModelId);
+  const mappedModelId = getMappedModelName(cleanModelId);
+  return geminiMockModels.find(model => model.id === mappedModelId);
 }
 
 /**

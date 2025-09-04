@@ -1,0 +1,12 @@
+{
+  "mock-gpt-thinking": "gpt-4o-mini",
+  "mock-gpt-thinking-tag": "gpt-4o-mini",
+  "gpt-4-mock": "gpt-4-turbo",
+  "mock-gpt-markdown": "gpt-4o",
+  "gpt-4o-image": "dall-e-3",
+  "mock-claude-markdown": "claude-3-opus-20240229",
+  "gemini-1.5-pro": "gemini-2.0-pro-exp-2025-01-15",
+  "gemini-1.5-flash": "gemini-2.0-flash-exp-2025-01-15",
+  "gemini-pro": "gemini-pro-1.0",
+  "gemini-pro-vision": "gemini-pro-vision-1.0"
+}

@@ -1,5 +1,6 @@
 import { MockModel, MockTestCase } from '../types';
 import { mockModels } from '../data/mockData';
+import { getMappedModelName, getOriginalModelName } from '../config/modelMapping';
 
 /**
  * Generate unique chat completion ID
@@ -26,7 +27,22 @@ export function getCurrentTimestamp(): number {
  * Find model by ID
  */
 export function findModelById(modelId: string): MockModel | undefined {
-  return mockModels.find(model => model.id === modelId);
+  // First check if it's a direct match with original model ID
+  let foundModel = mockModels.find(model => model.id === modelId);
+
+  if (foundModel) {
+    return foundModel;
+  }
+
+  // If not found, check if it's a mapped model name, get the original ID
+  const originalModelId = getOriginalModelName(modelId);
+  if (originalModelId) {
+    return mockModels.find(model => model.id === originalModelId);
+  }
+
+  // Finally, try mapping the input and finding the model
+  const mappedModelId = getMappedModelName(modelId);
+  return mockModels.find(model => model.id === mappedModelId);
 }
 
 /**
