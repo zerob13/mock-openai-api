@@ -9,7 +9,7 @@
 
 *中文说明 | [English](README.md)*
 
-一个完整的 OpenAI API 兼容的模拟服务器，无需调用真实的大模型，返回预定义的测试数据。非常适合开发、测试和调试使用 OpenAI API 的应用程序。
+一个完整的 OpenAI、Anthropic、Gemini API 兼容模拟服务器，无需调用真实的大模型，返回确定性的本地测试数据。非常适合开发、测试和调试使用多家 AI API 的应用程序。
 
 ## 🚀 快速开始
 
@@ -110,7 +110,20 @@ npx mock-openai-api --help
    • Port: 3000
    • Host: 0.0.0.0
    • Verbose logging: DISABLED
-   • Version: 1.0.1
+   • Config file: ./model-mapping.json
+   • Version: 1.0.6
+📖 API Documentation:
+   OpenAI compatible:
+   • POST /v1/responses - Responses API 创建/流式/tool calls
+   • POST /v1/chat/completions - Chat Completions 创建/流式/tool calls
+   • POST /v1/embeddings - 确定性 embeddings
+   • POST /v1/files - 上传模拟文件
+   Anthropic compatible:
+   • POST /v1/messages - Messages 创建/流式/tool use/thinking
+   • POST /v1/messages/count_tokens - Message token 统计
+   Gemini compatible:
+   • POST /v1beta/models/{model}:generateContent - GenerateContent
+   • POST /upload/v1beta/files - 文件上传，兼容 SDK resumable upload
 ```
 
 ### 基本使用
@@ -118,6 +131,14 @@ npx mock-openai-api --help
 ```bash
 # 获取模型列表
 curl http://localhost:3000/v1/models
+
+# Responses API
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4.1-mini",
+    "input": "本地 agent harness 测试"
+  }'
 
 # 聊天完成（非流式）
 curl -X POST http://localhost:3000/v1/chat/completions \
@@ -150,6 +171,8 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ## 🎯 特性
 
 - ✅ **完整的 OpenAI API 兼容性**
+- ✅ **支持 Anthropic Claude API**
+- ✅ **支持 Google Gemini API**
 - ✅ **支持流式和非流式聊天完成**
 - ✅ **支持函数调用**
 - ✅ **支持图像生成**
@@ -160,17 +183,60 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ## 📋 支持的 API 端点
 
-### 模型管理
-- `GET /v1/models` - 获取可用模型列表
+### OpenAI 兼容端点
+- `GET /v1/models` - 默认获取 OpenAI 兼容模型列表
 - `GET /models` - 兼容端点
-
-### 聊天完成
+- `POST /v1/responses` - 创建确定性的 Responses API 响应
+- `GET /v1/responses/{response_id}` - 获取已存储的响应
+- `DELETE /v1/responses/{response_id}` - 删除已存储的响应
+- `POST /v1/responses/{response_id}/cancel` - 取消排队/进行中的响应
+- `GET /v1/responses/{response_id}/input_items` - 列出响应输入项
+- `POST /v1/responses/input_tokens` - 统计响应输入 token
+- `POST /v1/responses/compact` - 返回确定性的上下文压缩响应
 - `POST /v1/chat/completions` - 创建聊天完成
+- `GET /v1/chat/completions/{completion_id}` - 获取已存储的聊天完成
+- `POST /v1/chat/completions/{completion_id}` - 更新聊天完成 metadata
+- `DELETE /v1/chat/completions/{completion_id}` - 删除已存储的聊天完成
+- `GET /v1/chat/completions/{completion_id}/messages` - 列出聊天消息
 - `POST /chat/completions` - 兼容端点
-
-### 图像生成
 - `POST /v1/images/generations` - 生成图像
+- `POST /v1/images/edits` - 生成确定性的图像编辑结果
+- `POST /v1/images/variations` - 生成确定性的图像变体结果
 - `POST /images/generations` - 兼容端点
+- `POST /v1/embeddings` - 创建确定性的 embedding 向量
+- `POST /v1/files` - 上传模拟文件
+- `GET /v1/files` - 列出模拟文件
+- `GET /v1/files/{file_id}` - 获取模拟文件 metadata
+- `DELETE /v1/files/{file_id}` - 删除模拟文件
+
+### Anthropic 兼容端点
+- `GET /v1/models` - 设置 `anthropic-version` 或 `x-provider: anthropic` 时返回 Anthropic 模型列表
+- `GET /anthropic/v1/models` - 获取 Anthropic 模型列表
+- `POST /v1/messages` - 创建 Claude 兼容消息
+- `POST /anthropic/v1/messages` - 兼容消息端点
+- `POST /v1/messages/count_tokens` - 统计 Claude 兼容消息 token
+- `POST /v1/files` - 设置 Anthropic provider header 时上传 Anthropic 形状的模拟文件
+- `GET /v1/files` - 设置 Anthropic provider header 时列出 Anthropic 形状的模拟文件
+- `GET /v1/files/{file_id}` - 设置 Anthropic provider header 时获取文件 metadata
+- `DELETE /v1/files/{file_id}` - 设置 Anthropic provider header 时删除文件
+
+### Gemini 兼容端点
+- `GET /v1/models` - 设置 `x-provider: gemini` 或 `?provider=gemini` 时返回 Gemini 模型列表
+- `GET /v1beta/models` - 获取 Gemini 模型列表
+- `POST /v1beta/models/{model}:generateContent` - 生成内容
+- `POST /v1beta/models/{model}:streamGenerateContent` - 流式生成内容
+- `POST /v1beta/models/{model}:countTokens` - 统计 Gemini 请求 token
+- `POST /upload/v1beta/files` - 上传 Gemini 模拟文件
+- `GET /v1beta/files` - 列出 Gemini 模拟文件
+- `GET /v1beta/files/{name}` - 获取 Gemini 文件 metadata
+- `DELETE /v1beta/files/{name}` - 删除 Gemini 模拟文件
+- `POST /v1beta/cachedContents` - 创建 Gemini cached content
+- `GET /v1beta/cachedContents` - 列出 Gemini cached contents
+- `GET /v1beta/cachedContents/{name}` - 获取 Gemini cached content metadata
+- `DELETE /v1beta/cachedContents/{name}` - 删除 Gemini cached content
+- `GET /gemini/v1/models` - 旧版 Gemini 模型别名
+- `POST /gemini/v1/models/{model}/generateContent` - 旧版 Gemini 生成别名
+- `POST /gemini/v1/models/{model}/streamGenerateContent` - 旧版 Gemini 流式别名
 
 ### 健康检查
 - `GET /health` - 服务器健康状态
@@ -266,38 +332,77 @@ npm start
 
 ```
 src/
-├── types/          # TypeScript 类型定义
-├── data/           # 预定义的测试数据
-├── utils/          # 工具函数
-├── services/       # 业务逻辑服务
-├── controllers/    # 路由控制器
-├── routes/         # 路由定义
+├── core/           # 确定性场景、错误、状态、SSE、usage、校验
+├── providers/      # OpenAI、Anthropic、Gemini 协议路由和服务
+├── fixtures/       # provider fixture 示例
+├── data/           # 旧版预定义测试数据
+├── controllers/    # 旧版兼容 controller
+├── routes/         # 路由注册
 ├── app.ts          # Express 应用设置
 ├── index.ts        # 服务器启动
 └── cli.ts          # CLI 工具入口
+
+test/
+├── contract/       # 离线端点契约测试
+├── unit/           # 核心确定性基础设施测试
+└── sdk/            # 通过 RUN_SDK_TESTS=1 开启的 SDK smoke tests
 ```
 
-### 添加新的测试场景
+### Mock 控制项与场景速查
 
-1. 在 `src/data/mockData.ts` 中添加新的测试用例
-2. 可以为现有模型添加测试用例，或创建新的模型类型
-3. 重新构建项目：`npm run build`
+默认响应都是确定性的，也可以用 mock 控制项指定场景：
 
-示例：
+| 控制项 | 位置 | 说明 |
+| --- | --- | --- |
+| `x-mock-scenario` / `mock_scenario` | header、query 或 JSON body | 强制场景，例如 `tool_call`、`parallel_tools`、`structured_json`、`refusal`、`rate_limit`、`invalid_request`。 |
+| `x-mock-seed` | header | 固定生成 ID，便于重复测试。 |
+| `x-mock-latency-ms` / `mock_latency_ms` | header、query 或 JSON body | 在 handler 执行前添加端点延迟，最大 30000 ms。 |
+| `x-mock-stream-chunk-ms` / `mock_stream_chunk_ms` | header、query 或 JSON body | 为 provider SSE 帧之间添加延迟，用于测试流式客户端，最大 30000 ms。 |
+| `x-mock-error` / `mock_error` | header 或 query | 注入 provider 形状的 `400`、`401`、`403`、`404`、`409`、`429`、`500`、`529` 错误。 |
+| `x-mock-background` | header | 在支持的 OpenAI Responses 路由中创建 queued/background 响应。 |
 
-```typescript
-const newTestCase: MockTestCase = {
-  name: "新功能测试",
-  description: "测试新功能的描述",
-  prompt: "触发关键词",
-  response: "预期的响应内容",
-  streamChunks: ["分段", "流式", "内容"], // 可选
-  functionCall: { // 可选，仅用于 function 类型模型
-    name: "function_name",
-    arguments: { param: "value" }
-  }
-};
+常用场景：
+
+```bash
+# OpenAI Responses tool call
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "x-mock-scenario: tool_call" \
+  -d '{"model":"gpt-4.1-mini","input":"查询订单 A100","tools":[{"type":"function","name":"get_order"}]}'
+
+# Anthropic parallel tool use
+curl -X POST http://localhost:3000/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-mock-scenario: parallel_tools" \
+  -d '{"model":"claude-sonnet-4-5","max_tokens":256,"messages":[{"role":"user","content":"查询订单和天气"}],"tools":[{"name":"get_order","input_schema":{"type":"object"}},{"name":"get_weather","input_schema":{"type":"object"}}]}'
+
+# Gemini structured JSON
+curl -X POST http://localhost:3000/v1beta/models/gemini-1.5-flash:generateContent \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"role":"user","parts":[{"text":"提取商品数据"}]}],"generationConfig":{"responseMimeType":"application/json","responseSchema":{"type":"OBJECT"}}}'
+
+# 延迟流式分块
+curl -N -X POST http://localhost:3000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "x-mock-stream-chunk-ms: 100" \
+  -d '{"model":"gpt-4.1-mini","stream":true,"messages":[{"role":"user","content":"慢速流式输出"}]}'
 ```
+
+### Fixture 贡献
+
+Fixture 示例位于：
+
+```txt
+src/fixtures/openai/
+src/fixtures/anthropic/
+src/fixtures/gemini/
+```
+
+新增 fixture 时请保持离线、确定性：不要复制真实线上 provider payload，不做真实 API 调用，ID/时间戳要稳定，并为新增场景补充对应 contract 或 unit test。当前运行时响应主要由 provider service 生成，fixture 文件用于贡献示例和后续 fixture-store 扩展。
+
+### 迁移说明
+
+旧版端点会继续保留：`/models`、`/chat/completions`、`/images/generations`、`/anthropic/v1/models`、`/anthropic/v1/messages`、以及 `/gemini/v1/...` 别名仍然可用；新的 `/v1/...` 和 `/v1beta/...` provider 兼容端点会继续扩展。
 
 ## 🌐 部署
 
@@ -418,6 +523,13 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ### 使用 OpenAI SDK 测试
 
+本地 SDK smoke tests 默认跳过，只有显式开启时才运行：
+
+```bash
+npm test
+RUN_SDK_TESTS=1 npm test -- test/sdk
+```
+
 ```javascript
 import OpenAI from 'openai';
 
@@ -462,6 +574,54 @@ const image = await client.images.generate({
 });
 
 console.log(image.data[0].url);
+```
+
+### 使用 Anthropic SDK 测试
+
+```javascript
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  baseURL: 'http://localhost:3000',
+  apiKey: 'mock-key'
+});
+
+const message = await anthropic.messages.create({
+  model: 'claude-sonnet-4-5',
+  max_tokens: 256,
+  messages: [{ role: 'user', content: '你好' }],
+  tools: [{ name: 'get_order', input_schema: { type: 'object' } }]
+});
+
+console.log(message.content);
+```
+
+### 使用 Google GenAI SDK 测试
+
+```javascript
+import { GoogleGenAI } from '@google/genai';
+
+const ai = new GoogleGenAI({
+  apiKey: 'mock-key',
+  httpOptions: {
+    baseUrl: 'http://localhost:3000',
+    apiVersion: 'v1beta'
+  }
+});
+
+const response = await ai.models.generateContent({
+  model: 'gemini-1.5-flash',
+  contents: '你好'
+});
+
+console.log(response.text);
+
+const file = await ai.files.upload({
+  file: new Blob(['mock file'], { type: 'text/plain' }),
+  config: { mimeType: 'text/plain', displayName: 'mock.txt' }
+});
+
+console.log(file.uri);
 ```
 
 ## 🤝 贡献

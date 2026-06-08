@@ -1,0 +1,19 @@
+{
+  "id": "msg_mock_0001",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-5",
+  "content": [
+    {
+      "type": "thinking",
+      "thinking": "We need to inspect the request and return a deterministic mock answer.",
+      "signature": "sig_mock_0001"
+    },
+    {
+      "type": "text",
+      "text": "The deterministic thinking mock completed the request."
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null
+}

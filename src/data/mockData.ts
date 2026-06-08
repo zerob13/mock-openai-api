@@ -1,4 +1,4 @@
-import { MockModel, MockTestCase } from '../types';
+import { MockModel } from '../types';
 import { thinkingTestCases, functionTestCases, markdownTestCases } from './testCases';
 import { ImgData } from './base64Img';
 

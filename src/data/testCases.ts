@@ -1,4 +1,4 @@
-import { MockModel, MockTestCase } from '../types';
+import { MockTestCase } from '../types';
 import { ImgData } from './base64Img';
 // Thinking model test cases
 export const thinkingTestCases: MockTestCase[] = [

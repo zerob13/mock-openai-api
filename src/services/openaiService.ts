@@ -841,7 +841,6 @@ export function generateImage(
 ): ImageGenerationResponse {
   const n = request.n || 1;
   const timestamp = getCurrentTimestamp();
-  const size = request.size || "1024x1024";
 
   // Choose different images based on model
   const model = request.model || "gpt-4o-image";
