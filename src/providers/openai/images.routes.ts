@@ -5,7 +5,14 @@ import { ProviderError } from "../../core/errors/providerErrors";
 import { ImgData } from "../../data/base64Img";
 
 export const openAIImagesSupportRouter: Router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 2,
+    fileSize: 10 * 1024 * 1024,
+    fields: 20,
+  },
+});
 
 openAIImagesSupportRouter.post("/edits", upload.any(), handleImageEdit as RequestHandler);
 openAIImagesSupportRouter.post("/variations", upload.any(), handleImageVariation as RequestHandler);

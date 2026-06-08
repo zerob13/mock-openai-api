@@ -48,11 +48,15 @@ router.use("/v1/chat/completions", openAIChatRouter);
 router.post("/chat/completions", handleCreateChatCompletion as RequestHandler);
 
 // Anthropic API compatible endpoints
-console.log('🔧 [Router] Registering Anthropic routes...');
+if (global.verboseLogging) {
+  console.log('🔧 [Router] Registering Anthropic routes...');
+}
 router.use("/v1/messages", anthropicMessagesRouter);
 router.get("/anthropic/v1/models", handleListAnthropicModels as RequestHandler);
 router.post("/anthropic/v1/messages", handleAnthropicMessage as RequestHandler);
-console.log('✅ [Router] Anthropic routes registered successfully');
+if (global.verboseLogging) {
+  console.log('✅ [Router] Anthropic routes registered successfully');
+}
 
 // Gemini API compatible endpoints (matching Google's official format)
 router.get("/v1beta/models", handleListGeminiModels as RequestHandler);

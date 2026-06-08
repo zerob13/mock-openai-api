@@ -169,7 +169,7 @@ function validateOpenAITool(tool: unknown, path: string): ValidationIssue | unde
     return { message: "tool must be an object", param: path, code: "invalid_request" };
   }
 
-  if (tool.type !== undefined && (typeof tool.type !== "string" || !TOOL_TYPES.has(tool.type))) {
+  if (typeof tool.type !== "string" || !TOOL_TYPES.has(tool.type)) {
     return { message: "tool has an invalid type", param: `${path}.type`, code: "invalid_request" };
   }
 

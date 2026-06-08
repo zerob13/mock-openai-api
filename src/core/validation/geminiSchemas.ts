@@ -173,19 +173,7 @@ function validateGeminiGenerationConfig(config: unknown): ValidationIssue | unde
 }
 
 function validateFunctionResponseIds(contents: unknown[]): ValidationIssue | undefined {
-  const functionCallIds = new Set<string>();
-
-  for (const content of contents) {
-    if (!isRecord(content) || !Array.isArray(content.parts)) {
-      continue;
-    }
-
-    for (const part of content.parts) {
-      if (isRecord(part) && isRecord(part.functionCall) && typeof part.functionCall.id === "string") {
-        functionCallIds.add(part.functionCall.id);
-      }
-    }
-  }
+  const seenFunctionCallIds = new Set<string>();
 
   for (const [contentIndex, content] of contents.entries()) {
     if (!isRecord(content) || !Array.isArray(content.parts)) {
@@ -193,12 +181,15 @@ function validateFunctionResponseIds(contents: unknown[]): ValidationIssue | und
     }
 
     for (const [partIndex, part] of content.parts.entries()) {
+      if (isRecord(part) && isRecord(part.functionCall) && typeof part.functionCall.id === "string") {
+        seenFunctionCallIds.add(part.functionCall.id);
+      }
       if (
         isRecord(part) &&
         isRecord(part.functionResponse) &&
         typeof part.functionResponse.id === "string" &&
-        functionCallIds.size > 0 &&
-        !functionCallIds.has(part.functionResponse.id)
+        seenFunctionCallIds.size > 0 &&
+        !seenFunctionCallIds.has(part.functionResponse.id)
       ) {
         return {
           message: "functionResponse id does not match a previous functionCall id",

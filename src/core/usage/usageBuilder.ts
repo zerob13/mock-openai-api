@@ -34,13 +34,15 @@ export function buildOpenAIResponsesUsage(
 ): OpenAIResponsesUsage {
   const inputTokens = estimateTokens(input);
   const outputTokens = estimateTokens(output);
+  const safeReasoningTokens = Math.max(0, reasoningTokens);
+  const safeCachedTokens = Math.max(0, cachedTokens);
 
   return {
     input_tokens: inputTokens,
-    input_tokens_details: { cached_tokens: cachedTokens },
+    input_tokens_details: { cached_tokens: safeCachedTokens },
     output_tokens: outputTokens,
-    output_tokens_details: { reasoning_tokens: reasoningTokens },
-    total_tokens: inputTokens + outputTokens + reasoningTokens,
+    output_tokens_details: { reasoning_tokens: safeReasoningTokens },
+    total_tokens: inputTokens + outputTokens,
   };
 }
 
@@ -51,14 +53,15 @@ export function buildOpenAIChatUsage(
 ): OpenAIChatUsage {
   const promptTokens = estimateTokens(input);
   const completionTokens = estimateTokens(output);
+  const safeReasoningTokens = Math.max(0, reasoningTokens);
   const usage: OpenAIChatUsage = {
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens + reasoningTokens,
+    total_tokens: promptTokens + completionTokens,
   };
 
-  if (reasoningTokens > 0) {
-    usage.completion_tokens_details = { reasoning_tokens: reasoningTokens };
+  if (safeReasoningTokens > 0) {
+    usage.completion_tokens_details = { reasoning_tokens: safeReasoningTokens };
   }
 
   return usage;

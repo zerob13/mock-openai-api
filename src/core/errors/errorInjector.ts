@@ -50,5 +50,11 @@ function readQueryString(query: Record<string, unknown>, name: string): string |
     return String(value);
   }
 
+  if (Array.isArray(value)) {
+    const firstScalar = value.find((item) => typeof item === "string" || typeof item === "number");
+    if (typeof firstScalar === "string") return firstScalar;
+    if (typeof firstScalar === "number") return String(firstScalar);
+  }
+
   return undefined;
 }

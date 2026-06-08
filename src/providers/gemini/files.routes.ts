@@ -83,7 +83,10 @@ function handleFinalizeResumableUpload(req: Request, res: Response) {
   }
 
   const id = req.params.upload_id;
-  const file = pendingUploads.get(id) || buildFileObject({ id });
+  const file = pendingUploads.get(id);
+  if (!file) {
+    return sendError(res, buildGeminiError(404, `Upload session '${id}' was not found.`));
+  }
 
   pendingUploads.delete(id);
   files.set(file.name, file);

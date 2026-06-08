@@ -368,8 +368,16 @@ function collectFunctionCallIds(request: GeminiGenerateContentRequest): Set<stri
 
 function validateFunctionResponseIds(request: GeminiGenerateContentRequest): ProviderError | undefined {
   const functionCallIds = collectFunctionCallIds(request);
+  const hasFunctionResponseId = (request.contents || []).some((content) =>
+    (content.parts || []).some(
+      (part) => "functionResponse" in part && Boolean(part.functionResponse?.id)
+    )
+  );
 
   if (functionCallIds.size === 0) {
+    if (hasFunctionResponseId) {
+      return buildGeminiError(400, "functionResponse id does not match a previous functionCall id");
+    }
     return undefined;
   }
 

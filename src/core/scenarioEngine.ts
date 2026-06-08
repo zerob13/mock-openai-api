@@ -74,11 +74,17 @@ const ERROR_SCENARIOS: Record<number, ScenarioName> = {
   529: "rate_limit",
 };
 
+const MAX_MOCK_DELAY_MS = 30_000;
+
+function clampDelay(value: number): number {
+  return Math.min(value, MAX_MOCK_DELAY_MS);
+}
+
 export function selectScenario(input: ScenarioInput): ScenarioSelection {
   const forcedError = readNumberControl(input, "x-mock-error", "mock_error");
   const seed = readStringControl(input, "x-mock-seed", "mock_seed") || "default";
-  const latencyMs = readNumberControl(input, "x-mock-latency-ms", "mock_latency_ms") || 0;
-  const streamChunkMs = readNumberControl(input, "x-mock-stream-chunk-ms", "mock_stream_chunk_ms") || 0;
+  const latencyMs = clampDelay(readNumberControl(input, "x-mock-latency-ms", "mock_latency_ms") || 0);
+  const streamChunkMs = clampDelay(readNumberControl(input, "x-mock-stream-chunk-ms", "mock_stream_chunk_ms") || 0);
 
   if (forcedError !== undefined) {
     return {
@@ -118,10 +124,7 @@ export function isScenarioName(value: unknown): value is ScenarioName {
 function inferScenario(input: ScenarioInput): ScenarioName {
   const body = input.body;
   const model = (input.model || readBodyString(body, "model") || "").toLowerCase();
-
-  if (readBodyBoolean(body, "stream")) {
-    return "stream_text";
-  }
+  const isStreaming = readBodyBoolean(body, "stream");
 
   if (containsToolResult(body)) {
     return "tool_result";
@@ -137,6 +140,10 @@ function inferScenario(input: ScenarioInput): ScenarioName {
 
   if (containsStructuredOutputRequest(body)) {
     return "structured_json";
+  }
+
+  if (isStreaming) {
+    return "stream_text";
   }
 
   const multimodal = inferMultimodalScenario(body);

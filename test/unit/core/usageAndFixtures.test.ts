@@ -15,7 +15,7 @@ describe("usage builders and fixtures", () => {
       input_tokens_details: { cached_tokens: 0 },
       output_tokens: 2,
       output_tokens_details: { reasoning_tokens: 2 },
-      total_tokens: 6,
+      total_tokens: 4,
     });
     expect(buildOpenAIChatUsage("hello", "world")).toEqual({
       prompt_tokens: 2,

@@ -46,7 +46,8 @@ export class MemoryStateStore {
       return undefined;
     }
 
-    const updated = { ...existing, ...patch } as T;
+    const { id: _ignoredId, ...rest } = patch as Partial<T> & { id?: string };
+    const updated = { ...existing, ...rest, id } as T;
     this.collection<T>(collection).set(id, updated);
     return updated;
   }

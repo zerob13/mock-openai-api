@@ -273,9 +273,23 @@ export function compactOpenAIResponse(
 
 export function encodeOpenAIResponseStream(response: OpenAIResponseObject): string {
   const message = response.output.find((item) => item.type === "message");
-  const messageId = message?.id || "msg_mock_stream_0001";
-  const text = message && message.type === "message" ? extractMessageText(message) : "";
-  const chunks = splitText(text || "Hello from the mock Responses API.");
+  if (!message) {
+    const terminalEvents = [
+      openAIEvent("response.created", {
+        type: "response.created",
+        response: { id: response.id, object: "response", status: "in_progress" },
+      }),
+      openAIEvent(response.status === "failed" ? "response.failed" : "response.completed", {
+        type: response.status === "failed" ? "response.failed" : "response.completed",
+        response: { id: response.id, object: "response", status: response.status },
+      }),
+      openAIDone(),
+    ];
+    return terminalEvents.join("");
+  }
+  const messageId = message.id;
+  const text = extractMessageText(message);
+  const chunks = splitText(text);
 
   const events = [
     openAIEvent("response.created", {
@@ -465,8 +479,8 @@ function addInputId(input: unknown, factory: IdFactory): unknown {
   }
 
   return {
-    id: factory.next("message", "openai.responses.input"),
     ...input,
+    id: factory.next("message", "openai.responses.input"),
   };
 }
 

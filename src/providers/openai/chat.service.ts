@@ -334,7 +334,7 @@ export function encodeOpenAIChatCompletionStream(
     openAIData({
       ...base,
       choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-      usage: includeUsage ? null : completion.usage,
+      usage: includeUsage ? null : undefined,
     })
   );
 

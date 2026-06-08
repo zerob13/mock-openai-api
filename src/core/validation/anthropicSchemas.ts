@@ -18,8 +18,18 @@ const CONTENT_BLOCK_TYPES = new Set([
 const THINKING_TYPES = new Set(["enabled", "adaptive", "disabled"]);
 
 export function validateAnthropicMessageRequest(request: unknown): ValidationResult {
-  if (!isRecord(request) || !request.model || !request.messages || !request.max_tokens) {
+  if (
+    !isRecord(request) ||
+    typeof request.model !== "string" ||
+    request.model.trim().length === 0 ||
+    !Array.isArray(request.messages) ||
+    request.max_tokens === undefined
+  ) {
     return invalid("Missing required fields: model, messages, or max_tokens");
+  }
+
+  if (!Number.isInteger(request.max_tokens) || Number(request.max_tokens) <= 0) {
+    return { ok: false, issue: { message: "max_tokens must be a positive integer", param: "max_tokens" } };
   }
 
   const commonIssue = validateAnthropicCommonRequest(request, true);
@@ -31,7 +41,12 @@ export function validateAnthropicMessageRequest(request: unknown): ValidationRes
 }
 
 export function validateAnthropicCountTokensRequest(request: unknown): ValidationResult {
-  if (!isRecord(request) || !request.model || !request.messages) {
+  if (
+    !isRecord(request) ||
+    typeof request.model !== "string" ||
+    request.model.trim().length === 0 ||
+    !Array.isArray(request.messages)
+  ) {
     return invalid("Missing required fields: model or messages");
   }
 
