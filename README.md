@@ -165,7 +165,20 @@ When the server starts, it will display the configuration being used:
    • Port: 3000
    • Host: 0.0.0.0
    • Verbose logging: DISABLED
-   • Version: 1.0.1
+   • Config file: ./model-mapping.json
+   • Version: 1.0.6
+📖 API Documentation:
+   OpenAI compatible:
+   • POST /v1/responses - Responses API create/stream/tool calls
+   • POST /v1/chat/completions - Chat Completions create/stream/tool calls
+   • POST /v1/embeddings - Deterministic embeddings
+   • POST /v1/files - Upload mock files
+   Anthropic compatible:
+   • POST /v1/messages - Messages create/stream/tool use/thinking
+   • POST /v1/messages/count_tokens - Message token counting
+   Gemini compatible:
+   • POST /v1beta/models/{model}:generateContent - GenerateContent
+   • POST /upload/v1beta/files - File upload, including SDK resumable upload
 ```
 
 ### Basic Usage
@@ -173,6 +186,14 @@ When the server starts, it will display the configuration being used:
 ```bash
 # Get model list
 curl http://localhost:3000/v1/models
+
+# Responses API
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4.1-mini",
+    "input": "Hello from a local agent harness"
+  }'
 
 # Chat completion (non-streaming)
 curl -X POST http://localhost:3000/v1/chat/completions \
@@ -220,21 +241,59 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ## 📋 Supported API Endpoints
 
 ### OpenAI Compatible Endpoints
-- `GET /v1/models` - Get available model list
+- `GET /v1/models` - Get available OpenAI-compatible model list by default
 - `GET /models` - Compatible endpoint
+- `POST /v1/responses` - Create a deterministic Responses API response
+- `GET /v1/responses/{response_id}` - Retrieve a stored response
+- `DELETE /v1/responses/{response_id}` - Delete a stored response
+- `POST /v1/responses/{response_id}/cancel` - Cancel a queued/in-progress response
+- `GET /v1/responses/{response_id}/input_items` - List stored input items
+- `POST /v1/responses/input_tokens` - Count response input tokens
+- `POST /v1/responses/compact` - Return a compacted mock context response
 - `POST /v1/chat/completions` - Create chat completion
+- `GET /v1/chat/completions/{completion_id}` - Retrieve a stored chat completion
+- `POST /v1/chat/completions/{completion_id}` - Update stored chat completion metadata
+- `DELETE /v1/chat/completions/{completion_id}` - Delete a stored chat completion
+- `GET /v1/chat/completions/{completion_id}/messages` - List stored chat messages
 - `POST /chat/completions` - Compatible endpoint
 - `POST /v1/images/generations` - Generate images
+- `POST /v1/images/edits` - Generate deterministic image edit results
+- `POST /v1/images/variations` - Generate deterministic image variation results
 - `POST /images/generations` - Compatible endpoint
+- `POST /v1/embeddings` - Create deterministic embedding vectors
+- `POST /v1/files` - Upload a mock file
+- `GET /v1/files` - List uploaded mock files
+- `GET /v1/files/{file_id}` - Retrieve mock file metadata
+- `DELETE /v1/files/{file_id}` - Delete a mock file
 
 ### Anthropic Compatible Endpoints
+- `GET /v1/models` - Get Anthropic model list when `anthropic-version` or `x-provider: anthropic` is set
 - `GET /anthropic/v1/models` - Get Anthropic model list
+- `POST /v1/messages` - Create a Claude-compatible message
 - `POST /anthropic/v1/messages` - Create message (Claude API)
+- `POST /v1/messages/count_tokens` - Count Claude-compatible message tokens
+- `POST /v1/files` - Upload an Anthropic-shaped mock file when `anthropic-version` or `x-provider: anthropic` is set
+- `GET /v1/files` - List Anthropic-shaped mock files with Anthropic provider headers
+- `GET /v1/files/{file_id}` - Retrieve Anthropic-shaped mock file metadata with Anthropic provider headers
+- `DELETE /v1/files/{file_id}` - Delete Anthropic-shaped mock files with Anthropic provider headers
 
 ### Gemini Compatible Endpoints
+- `GET /v1/models` - Get Gemini model list when `x-provider: gemini` or `?provider=gemini` is set
 - `GET /v1beta/models` - Get Gemini model list
 - `POST /v1beta/models/{model}:generateContent` - Generate content
 - `POST /v1beta/models/{model}:streamGenerateContent` - Generate content (streaming)
+- `POST /v1beta/models/{model}:countTokens` - Count Gemini request tokens
+- `POST /upload/v1beta/files` - Upload a Gemini mock file
+- `GET /v1beta/files` - List Gemini mock files
+- `GET /v1beta/files/{name}` - Retrieve Gemini mock file metadata
+- `DELETE /v1beta/files/{name}` - Delete a Gemini mock file
+- `POST /v1beta/cachedContents` - Create a Gemini cached content record
+- `GET /v1beta/cachedContents` - List Gemini cached content records
+- `GET /v1beta/cachedContents/{name}` - Retrieve Gemini cached content metadata
+- `DELETE /v1beta/cachedContents/{name}` - Delete Gemini cached content
+- `GET /gemini/v1/models` - Legacy Gemini model list alias
+- `POST /gemini/v1/models/{model}/generateContent` - Legacy Gemini generate alias
+- `POST /gemini/v1/models/{model}/streamGenerateContent` - Legacy Gemini stream alias
 
 ### Health Check
 - `GET /health` - Server health status
@@ -371,38 +430,80 @@ npm start
 
 ```
 src/
-├── types/          # TypeScript type definitions
-├── data/           # Predefined test data
-├── utils/          # Utility functions
-├── services/       # Business logic services
-├── controllers/    # Route controllers
-├── routes/         # Route definitions
+├── core/           # Deterministic scenarios, errors, state, SSE, usage, validation
+├── providers/      # OpenAI, Anthropic, Gemini protocol routes and services
+├── fixtures/       # Provider fixture seeds for contribution examples
+├── data/           # Legacy predefined test data
+├── controllers/    # Legacy-compatible controllers
+├── routes/         # Route registration
 ├── app.ts          # Express app setup
 ├── index.ts        # Server startup
 └── cli.ts          # CLI tool entry
+
+test/
+├── contract/       # Offline endpoint contract tests
+├── unit/           # Core deterministic infrastructure tests
+└── sdk/            # Optional SDK smoke tests gated by RUN_SDK_TESTS=1
 ```
 
-### Adding New Test Scenarios
+### Mock Controls and Scenario Cookbook
 
-1. Add new test cases in `src/data/mockData.ts`
-2. You can add test cases for existing models or create new model types
-3. Rebuild the project: `npm run build`
+Every provider route is deterministic by default and can be steered with mock controls:
 
-Example:
+| Control | Location | Description |
+| --- | --- | --- |
+| `x-mock-scenario` / `mock_scenario` | header, query, or JSON body | Forces a supported scenario such as `tool_call`, `parallel_tools`, `structured_json`, `refusal`, `rate_limit`, or `invalid_request`. |
+| `x-mock-seed` | header | Makes generated IDs deterministic for repeatable tests. |
+| `x-mock-latency-ms` / `mock_latency_ms` | header, query, or JSON body | Adds endpoint latency before the handler runs. Values are capped at 30000 ms. |
+| `x-mock-stream-chunk-ms` / `mock_stream_chunk_ms` | header, query, or JSON body | Adds delay between provider SSE frames for streaming client tests. Values are capped at 30000 ms. |
+| `x-mock-error` / `mock_error` | header or query | Injects provider-shaped `400`, `401`, `403`, `404`, `409`, `429`, `500`, or `529` errors. |
+| `x-mock-background` | header | Creates queued/background OpenAI Responses where supported. |
 
-```typescript
-const newTestCase: MockTestCase = {
-  name: "New Feature Test",
-  description: "Description of new feature test",
-  prompt: "trigger keyword",
-  response: "Expected response content",
-  streamChunks: ["chunked", "streaming", "content"], // optional
-  functionCall: { // optional, only for function type models
-    name: "function_name",
-    arguments: { param: "value" }
-  }
-};
+Common scenarios:
+
+```bash
+# OpenAI Responses tool call
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "x-mock-scenario: tool_call" \
+  -d '{"model":"gpt-4.1-mini","input":"Look up order A100.","tools":[{"type":"function","name":"get_order"}]}'
+
+# Anthropic parallel tool use
+curl -X POST http://localhost:3000/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-mock-scenario: parallel_tools" \
+  -d '{"model":"claude-sonnet-4-5","max_tokens":256,"messages":[{"role":"user","content":"Check order and weather"}],"tools":[{"name":"get_order","input_schema":{"type":"object"}},{"name":"get_weather","input_schema":{"type":"object"}}]}'
+
+# Gemini structured JSON
+curl -X POST http://localhost:3000/v1beta/models/gemini-1.5-flash:generateContent \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"role":"user","parts":[{"text":"Extract product data"}]}],"generationConfig":{"responseMimeType":"application/json","responseSchema":{"type":"OBJECT"}}}'
+
+# Provider-shaped injected error
+curl http://localhost:3000/v1beta/files -H "x-mock-error: 429"
+
+# Delayed stream chunks
+curl -N -X POST http://localhost:3000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "x-mock-stream-chunk-ms: 100" \
+  -d '{"model":"gpt-4.1-mini","stream":true,"messages":[{"role":"user","content":"Stream slowly"}]}'
 ```
+
+### Fixture Contributions
+
+Fixture seed examples live under:
+
+```txt
+src/fixtures/openai/
+src/fixtures/anthropic/
+src/fixtures/gemini/
+```
+
+Keep fixtures offline and deterministic: no real provider payloads copied from production, no live API calls, stable IDs/timestamps, and one focused contract or unit test for each new scenario. Runtime behavior is generated by provider services; fixture files are intentionally small examples for contributors and future fixture-store wiring.
+
+### Migration Note
+
+Legacy endpoints remain supported: `/models`, `/chat/completions`, `/images/generations`, `/anthropic/v1/models`, `/anthropic/v1/messages`, and `/gemini/v1/...` aliases continue to work while the newer provider-compatible `/v1/...` and `/v1beta/...` surfaces are expanded.
 
 ## 🌐 Deployment
 
@@ -671,6 +772,13 @@ curl https://mockllm.anya2a.com/v1/models \
 
 ### Testing with OpenAI SDK
 
+Local SDK smoke tests are gated so normal offline tests stay fast:
+
+```bash
+npm test
+RUN_SDK_TESTS=1 npm test -- test/sdk
+```
+
 ```javascript
 import OpenAI from 'openai';
 
@@ -715,6 +823,62 @@ const image = await client.images.generate({
 });
 
 console.log(image.data[0].url);
+```
+
+### Testing with Anthropic SDK
+
+```javascript
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  baseURL: 'http://localhost:3000',
+  apiKey: 'mock-key'
+});
+
+const message = await anthropic.messages.create({
+  model: 'claude-sonnet-4-5',
+  max_tokens: 256,
+  messages: [{ role: 'user', content: 'Hello' }],
+  tools: [{ name: 'get_order', input_schema: { type: 'object' } }]
+});
+
+console.log(message.content);
+
+const stream = anthropic.messages.stream({
+  model: 'claude-sonnet-4-5',
+  max_tokens: 256,
+  messages: [{ role: 'user', content: 'Stream hello' }]
+});
+
+console.log((await stream.finalMessage()).stop_reason);
+```
+
+### Testing with Google GenAI SDK
+
+```javascript
+import { GoogleGenAI } from '@google/genai';
+
+const ai = new GoogleGenAI({
+  apiKey: 'mock-key',
+  httpOptions: {
+    baseUrl: 'http://localhost:3000',
+    apiVersion: 'v1beta'
+  }
+});
+
+const response = await ai.models.generateContent({
+  model: 'gemini-1.5-flash',
+  contents: 'Hello'
+});
+
+console.log(response.text);
+
+const file = await ai.files.upload({
+  file: new Blob(['mock file'], { type: 'text/plain' }),
+  config: { mimeType: 'text/plain', displayName: 'mock.txt' }
+});
+
+console.log(file.uri);
 ```
 
 ## 🤝 Contributing

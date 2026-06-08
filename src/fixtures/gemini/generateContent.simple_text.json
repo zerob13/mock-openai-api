@@ -1,0 +1,20 @@
+{
+  "provider": "gemini",
+  "endpoint": "generateContent",
+  "scenario": "simple_text",
+  "data": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Hello from Gemini mock."
+            }
+          ]
+        },
+        "finishReason": "STOP"
+      }
+    ]
+  }
+}

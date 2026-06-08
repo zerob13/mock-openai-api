@@ -37,20 +37,28 @@
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "cli": "ts-node src/cli.ts",
     "lint": "npx -y oxlint src/**/*.ts"
   },
   "dependencies": {
     "commander": "^15.0.0",
     "cors": "^2.8.5",
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "multer": "^2.1.1"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@google/genai": "^2.8.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/multer": "^2.1.0",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^7.2.0",
+    "openai": "^6.42.0",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.8"
   }
 }

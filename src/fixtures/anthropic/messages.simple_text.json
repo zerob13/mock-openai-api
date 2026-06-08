@@ -1,0 +1,14 @@
+{
+  "provider": "anthropic",
+  "endpoint": "messages",
+  "scenario": "simple_text",
+  "data": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Hello from Anthropic mock."
+      }
+    ],
+    "stop_reason": "end_turn"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "chatcmpl_mock_0001",
+  "object": "chat.completion",
+  "created": 0,
+  "model": "gpt-4.1-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The mock chat model inspected the image input."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

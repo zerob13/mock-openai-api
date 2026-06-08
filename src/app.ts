@@ -1,5 +1,7 @@
 import express, { Express } from "express";
 import cors from "cors";
+import { endpointSummary, formatEndpointCatalog } from "./core/http/endpointCatalog";
+import { mockLatencyMiddleware } from "./core/http/mockControls";
 import routes from "./routes";
 
 // 扩展全局对象类型
@@ -8,11 +10,20 @@ declare global {
 }
 
 const app: Express = express();
+const jsonParser = express.json({ limit: "10mb" });
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use((req, res, next) => {
+  if (isGeminiResumableUploadChunk(req)) {
+    next();
+    return;
+  }
+
+  jsonParser(req, res, next);
+});
 app.use(express.urlencoded({ extended: true }));
+app.use(mockLatencyMiddleware());
 
 // Request logging middleware (conditional)
 app.use((req, res, next) => {
@@ -34,17 +45,7 @@ app.get("/", (req, res) => {
     message: "Mock OpenAI API Server",
     status: "running",
     timestamp: new Date().toISOString(),
-    availableEndpoints: [
-      "GET /health",
-      "GET /v1/models",
-      "POST /v1/chat/completions",
-      "POST /v1/images/generations",
-      "GET /anthropic/v1/models",
-      "POST /anthropic/v1/messages",
-      "GET /v1beta/models",
-      "POST /v1beta/models/{model}:generateContent",
-      "POST /v1beta/models/{model}:streamGenerateContent",
-    ],
+    availableEndpoints: endpointSummary(),
   });
 });
 
@@ -57,15 +58,7 @@ app.use((req, res) => {
   console.log(`❌ Method: ${req.method}`);
   console.log(`❌ Headers:`, JSON.stringify(req.headers, null, 2));
   console.log(`❌ Available routes:`);
-  console.log(`   - GET /health`);
-  console.log(`   - GET /v1/models`);
-  console.log(`   - POST /v1/chat/completions`);
-  console.log(`   - POST /v1/images/generations`);
-  console.log(`   - GET /anthropic/v1/models`);
-  console.log(`   - POST /anthropic/v1/messages`);
-  console.log(`   - GET /v1beta/models`);
-  console.log(`   - POST /v1beta/models/{model}:generateContent`);
-  console.log(`   - POST /v1beta/models/{model}:streamGenerateContent`);
+  formatEndpointCatalog().forEach((line) => console.log(line));
   
   res.status(404).json({
     error: {
@@ -75,17 +68,7 @@ app.use((req, res) => {
       method: req.method,
       path: req.path,
       originalUrl: req.originalUrl,
-      availableEndpoints: [
-        "GET /health",
-        "GET /v1/models",
-        "POST /v1/chat/completions",
-        "POST /v1/images/generations",
-        "GET /anthropic/v1/models",
-        "POST /anthropic/v1/messages",
-        "GET /v1beta/models",
-        "POST /v1beta/models/{model}:generateContent",
-        "POST /v1beta/models/{model}:streamGenerateContent",
-      ],
+      availableEndpoints: endpointSummary(),
     },
   });
 });
@@ -108,5 +91,10 @@ app.use(
     });
   }
 );
+
+function isGeminiResumableUploadChunk(req: express.Request): boolean {
+  const command = req.header("x-goog-upload-command")?.toLowerCase() || "";
+  return req.method === "POST" && req.path.startsWith("/upload/v1beta/files/") && !command.includes("start");
+}
 
 export default app;

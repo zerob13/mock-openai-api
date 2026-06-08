@@ -1,0 +1,9 @@
+{
+  "created": 0,
+  "data": [
+    {
+      "url": "mock://images/img_mock_0001",
+      "revised_prompt": "A deterministic mock image generation."
+    }
+  ]
+}
