@@ -48,7 +48,7 @@
     "multer": "^2.1.1"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.102.0",
+    "@anthropic-ai/sdk": "^0.112.0",
     "@google/genai": "^2.8.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
