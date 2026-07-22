@@ -7,7 +7,7 @@ import {
   captureToScenario,
   captureView,
 } from './capture-utils.js'
-import { API_ENDPOINTS, type GatewayContext } from './app.js'
+import { API_ENDPOINTS, resolveReplayCaptures, type GatewayContext } from './app.js'
 import { parseUpstreamBaseUrl, probeNetworkTarget } from './network.js'
 import {
   captureExactReplayEligibility,
@@ -154,6 +154,10 @@ async function moveCaptureToTrash(options: AdminAppOptions, id: string): Promise
   if (config.replayRecordingId === (detail.header.recordingId ?? detail.header.id)) {
     throw new Error('Capture belongs to the active replay recording; choose another recording before deleting it')
   }
+  if (config.replayPlaylist.includes(detail.header.id)
+    || (detail.header.recordingId && config.replayPlaylist.includes(detail.header.recordingId))) {
+    throw new Error('Capture belongs to the active replay playlist; remove it before deleting it')
+  }
   const source = path.join(options.capturesDirectory, detail.filename)
   const stats = await lstat(source)
   if (!stats.isFile() || stats.isSymbolicLink()) throw new Error('Capture target must be a regular file')
@@ -174,18 +178,20 @@ async function runtimeView(options: AdminAppOptions): Promise<Record<string, unk
   const config = options.runtime.snapshot()
   const captures = await options.captures.list({ includePartial: true })
   const scenarios = await options.scenarios.list()
-  const replayTotal = captures.filter((capture) => !capture.partial && (
-    capture.recordingId === config.replayRecordingId
-    || (capture.recordingId === undefined && capture.id === config.replayRecordingId)
-  ) && capture.valid && isGenerationCapture(capture)).length
+  const replayCaptures = await resolveReplayCaptures(options, config)
+  const replay = options.runtime.replayState(replayCaptures.map((capture) => capture.id))
   return {
     mode: config.mode,
     recordingProtocol: config.recordingProtocol,
     activeRecordingId: config.activeRecordingId,
     replayRecordingId: config.replayRecordingId,
+    replayPlaylist: config.replayPlaylist,
+    replayOrder: config.replayOrder,
+    replayLoop: config.replayLoop,
+    replaySequence: replay.sequence,
     replaySpeed: config.replaySpeed,
-    replayPosition: options.runtime.replayPosition(config.replayRecordingId),
-    replayTotal,
+    replayPosition: replay.position,
+    replayTotal: replay.sequence.length,
     revision: config.revision,
     activeRequests: options.metrics.activeRequests,
     apiBaseUrl: options.apiBaseUrl,
@@ -331,6 +337,17 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
     if (request.body.replayRecordingId !== undefined && typeof request.body.replayRecordingId !== 'string') {
       throw new Error('Replay recording id must be a string')
     }
+    if (request.body.replayPlaylist !== undefined && (!Array.isArray(request.body.replayPlaylist)
+      || request.body.replayPlaylist.length > 1_000
+      || !request.body.replayPlaylist.every((entry: unknown) => typeof entry === 'string'))) {
+      throw new Error('Replay playlist must be an array of at most 1000 capture or recording ids')
+    }
+    if (request.body.replayOrder !== undefined && !['sequential', 'random'].includes(request.body.replayOrder)) {
+      throw new Error('Replay order must be sequential or random')
+    }
+    if (request.body.replayLoop !== undefined && !['none', 'one', 'all'].includes(request.body.replayLoop)) {
+      throw new Error('Replay loop must be none, one, or all')
+    }
     let enabledEndpoints = current.enabledEndpoints
     if (request.body.enabledEndpoints !== undefined) {
       if (!Array.isArray(request.body.enabledEndpoints) || !request.body.enabledEndpoints.every(isProtocol)) {
@@ -369,10 +386,22 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
       const captures = await options.captures.listRecording(request.body.replayRecordingId, { includePartial: true })
       if (!captures.length) throw new Error('Replay recording not found')
     }
+    if (request.body.replayPlaylist?.length) {
+      const captures = await options.captures.list({ includePartial: true })
+      for (const entry of request.body.replayPlaylist as string[]) {
+        if (!captures.some((capture) => !capture.partial && capture.valid && isGenerationCapture(capture)
+          && (capture.id === entry || capture.recordingId === entry))) {
+          throw new Error(`Replay playlist entry not found or not replayable: ${entry}`)
+        }
+      }
+    }
     await options.runtime.update({
       mode: request.body.mode,
       recordingProtocol: request.body.recordingProtocol,
       replayRecordingId: request.body.replayRecordingId,
+      replayPlaylist: request.body.replayPlaylist,
+      replayOrder: request.body.replayOrder,
+      replayLoop: request.body.replayLoop,
       replaySpeed: request.body.replaySpeed,
       enabledEndpoints,
       upstreams,

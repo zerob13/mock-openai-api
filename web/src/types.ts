@@ -1,11 +1,17 @@
 export type Protocol = 'openai-chat' | 'openai-responses' | 'anthropic-messages'
 export type RuntimeMode = 'record' | 'replay'
+export type ReplayOrder = 'sequential' | 'random'
+export type ReplayLoop = 'none' | 'one' | 'all'
 
 export interface RuntimeState {
   mode: RuntimeMode
   recordingProtocol: Protocol
   activeRecordingId: string
   replayRecordingId: string
+  replayPlaylist: string[]
+  replayOrder: ReplayOrder
+  replayLoop: ReplayLoop
+  replaySequence: string[]
   replaySpeed: number | 'instant'
   replayPosition: number
   replayTotal: number

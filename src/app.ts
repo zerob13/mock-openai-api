@@ -252,19 +252,14 @@ async function replayNextRecordingResponse(
   originNs: bigint,
 ): Promise<boolean> {
   const config = context.runtime.snapshot()
-  const recordingId = config.replayRecordingId
-  const captures = (await context.captures.listRecording(recordingId)).filter((capture) => (
-    capture.valid
-    && capture.protocol !== undefined
-    && captureMatchesEndpoint(capture.downstreamUrl ?? '', capture.protocol)
-  ))
+  const captures = await resolveReplayCaptures(context, config)
   if (!captures.length) return false
-  const next = context.runtime.claimReplay(recordingId, captures.map((capture) => capture.id))
+  const next = context.runtime.claimReplay(captures.map((capture) => capture.id))
   if (!next) {
-    const position = context.runtime.replayPosition(recordingId)
+    const position = context.runtime.replayPosition()
     response.status(409).json(protocolError(
       protocol,
-      `Recording exhausted (${position}/${captures.length}); start replay again to rewind`,
+      `Replay playlist exhausted (${position}/${captures.length}); restart playback to rewind`,
       'recording_exhausted',
     ))
     return true
@@ -348,7 +343,7 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
       }
 
       const body = await readRawBody(request)
-      if (config.replayRecordingId) {
+      if (config.replayPlaylist.length || config.replayRecordingId) {
         if (await replayNextRecordingResponse(context, protocol, response, signal, originNs)) return
       }
       const metadata = requestMetadata(body)
@@ -429,6 +424,41 @@ function captureMatchesEndpoint(downstreamUrl: string, protocol: GatewayProtocol
   }
 }
 
+export async function resolveReplayCaptures(
+  context: Pick<GatewayContext, 'captures' | 'runtime'>,
+  config = context.runtime.snapshot(),
+): Promise<CaptureSummary[]> {
+  const entries = config.replayPlaylist.length
+    ? config.replayPlaylist
+    : config.replayRecordingId ? [config.replayRecordingId] : []
+  if (!entries.length) return []
+  const captures = (await context.captures.list()).filter((capture) => (
+    capture.valid
+    && capture.protocol !== undefined
+    && captureMatchesEndpoint(capture.downstreamUrl ?? '', capture.protocol)
+  ))
+  const byId = new Map(captures.map((capture) => [capture.id, capture]))
+  const groups = new Map<string, CaptureSummary[]>()
+  for (const capture of captures) {
+    const id = capture.recordingId ?? capture.id
+    groups.set(id, [...(groups.get(id) ?? []), capture])
+  }
+  for (const group of groups.values()) {
+    group.sort((left, right) => (left.recordingOrder ?? 0) - (right.recordingOrder ?? 0)
+      || String(left.createdAt).localeCompare(String(right.createdAt)))
+  }
+  const result: CaptureSummary[] = []
+  for (const entry of entries) {
+    const group = groups.get(entry)
+    if (group) result.push(...group)
+    else {
+      const capture = byId.get(entry)
+      if (capture) result.push(capture)
+    }
+  }
+  return result
+}
+
 function captureMatchesModelsEndpoint(capture: CaptureSummary): boolean {
   try {
     const pathname = new URL(capture.downstreamUrl ?? '').pathname.replace(/\/+$/, '')
@@ -449,7 +479,12 @@ async function replayRecordedModelsResponse(
   originNs: bigint,
 ): Promise<boolean> {
   const config = context.runtime.snapshot()
-  const captures = await context.captures.listRecording(config.replayRecordingId)
+  const replayCaptures = await resolveReplayCaptures(context, config)
+  if (!replayCaptures.length) return false
+  const state = context.runtime.replayState(replayCaptures.map((capture) => capture.id))
+  const currentId = state.sequence[state.position % state.sequence.length] ?? state.sequence[0]
+  const current = replayCaptures.find((capture) => capture.id === currentId) ?? replayCaptures[0]
+  const captures = await context.captures.listRecording(current.recordingId ?? current.id)
   const summary = [...captures].reverse().find(captureMatchesModelsEndpoint)
   if (!summary) return false
   await replayCaptureResponse(await context.captures.read(summary.id), response, {
@@ -464,7 +499,7 @@ async function replayRecordedModelsResponse(
 function modelsHandler(context: GatewayContext): RequestHandler {
   return async (request, response, next) => {
     const config = context.runtime.snapshot()
-    if (config.mode === 'replay' && config.replayRecordingId) {
+    if (config.mode === 'replay' && (config.replayPlaylist.length || config.replayRecordingId)) {
       context.metrics.activeRequests += 1
       try {
         const replayed = await replayRecordedModelsResponse(

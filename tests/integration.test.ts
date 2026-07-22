@@ -23,6 +23,10 @@ interface RuntimeView {
   recordingProtocol: 'openai-chat' | 'openai-responses' | 'anthropic-messages'
   activeRecordingId: string
   replayRecordingId: string
+  replayPlaylist: string[]
+  replayOrder: 'sequential' | 'random'
+  replayLoop: 'none' | 'one' | 'all'
+  replaySequence: string[]
   replayPosition: number
   replayTotal: number
   revision: number
@@ -490,6 +494,102 @@ describe('startServer integration', () => {
       replayPosition: 1,
       replayTotal: 1,
     })
+  })
+
+  it('plays capture playlists sequentially, shuffled, and with repeat modes', async () => {
+    let sequence = 0
+    const upstream = createServer(async (request, response) => {
+      for await (const _chunk of request) { /* Drain the request before responding. */ }
+      sequence += 1
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify({
+        id: `chat-${sequence}`,
+        object: 'chat.completion',
+        choices: [{
+          index: 0,
+          message: { role: 'assistant', content: `track-${sequence}` },
+          finish_reason: 'stop',
+        }],
+      }))
+    })
+    upstream.listen(0, '127.0.0.1')
+    await once(upstream, 'listening')
+    upstreamServers.push(upstream)
+    const address = upstream.address()
+    if (!address || typeof address === 'string') throw new Error('Upstream did not bind')
+
+    const servers = await startTestServer()
+    await updateMode(servers, 'record', [{
+      protocol: 'openai-chat',
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      allowPrivateNetwork: true,
+    }], ['openai-chat'], 'openai-chat')
+    const request = (): Promise<Response> => fetch(`${servers.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(requestBody('openai-chat', false)),
+    })
+    await (await request()).arrayBuffer()
+    await (await request()).arrayBuffer()
+    await waitForCaptures(servers, 2)
+    await updateMode(servers, 'replay')
+    await updateMode(servers, 'record')
+    await (await request()).arrayBuffer()
+    await waitForCaptures(servers, 3)
+    await updateMode(servers, 'replay')
+
+    const recordings = await adminJson<Array<{ id: string; requests: CaptureView[] }>>(
+      servers,
+      '/admin/api/recordings',
+    )
+    const pair = recordings.find((recording) => recording.requests.length === 2)
+    const single = recordings.find((recording) => recording.requests.length === 1)
+    if (!pair || !single) throw new Error('Expected two recording sessions')
+    const playlist = [single.requests[0].id, ...pair.requests.map((capture) => capture.id)]
+
+    const configure = async (replayOrder: RuntimeView['replayOrder'], replayLoop: RuntimeView['replayLoop']): Promise<RuntimeView> => {
+      const runtime = await adminJson<RuntimeView>(servers, '/admin/api/runtime')
+      return adminJson<RuntimeView>(servers, '/admin/api/runtime', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          revision: runtime.revision,
+          mode: 'replay',
+          replayPlaylist: playlist,
+          replayOrder,
+          replayLoop,
+          replaySpeed: 'instant',
+        }),
+      })
+    }
+    const content = async (): Promise<string> => {
+      const response = await request()
+      expect(response.status).toBe(200)
+      const body = await response.json() as { choices: Array<{ message: { content: string } }> }
+      return body.choices[0].message.content
+    }
+
+    expect(await configure('sequential', 'all')).toMatchObject({
+      replayPlaylist: playlist,
+      replayPosition: 0,
+      replayTotal: 3,
+    })
+    expect([await content(), await content(), await content(), await content()]).toEqual([
+      'track-3',
+      'track-1',
+      'track-2',
+      'track-3',
+    ])
+
+    await configure('random', 'none')
+    expect(new Set([await content(), await content(), await content()])).toEqual(new Set([
+      'track-1',
+      'track-2',
+      'track-3',
+    ]))
+    expect((await request()).status).toBe(409)
+
+    await configure('sequential', 'one')
+    expect([await content(), await content()]).toEqual(['track-3', 'track-3'])
   })
 
   it('records a byte-exact raw proxy and replays it raw or transcoded', async () => {

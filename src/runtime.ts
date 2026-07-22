@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseUpstreamBaseUrl } from './network.js'
@@ -6,6 +6,8 @@ import { parseUpstreamBaseUrl } from './network.js'
 export type GatewayProtocol = 'openai-chat' | 'openai-responses' | 'anthropic-messages'
 export type RuntimeMode = 'record' | 'replay'
 export type ReplaySpeed = number | 'instant'
+export type ReplayOrder = 'sequential' | 'random'
+export type ReplayLoop = 'none' | 'one' | 'all'
 
 export interface ReplaySource {
   kind: 'scenario' | 'capture'
@@ -29,6 +31,9 @@ export interface RuntimeConfig {
   recordingProtocol: GatewayProtocol
   activeRecordingId: string
   replayRecordingId: string
+  replayPlaylist: string[]
+  replayOrder: ReplayOrder
+  replayLoop: ReplayLoop
   replaySpeed: ReplaySpeed
   revision: number
   enabledEndpoints: GatewayProtocol[]
@@ -60,6 +65,9 @@ function defaultConfig(): RuntimeConfig {
     recordingProtocol: 'openai-chat',
     activeRecordingId: '',
     replayRecordingId: '',
+    replayPlaylist: [],
+    replayOrder: 'sequential',
+    replayLoop: 'none',
     replaySpeed: 1,
     revision: 1,
     enabledEndpoints: [...PROTOCOLS],
@@ -119,6 +127,18 @@ function normalizeConfig(value: unknown): RuntimeConfig {
   }
   config.activeRecordingId = normalizeRecordingId(raw.activeRecordingId, true)
   config.replayRecordingId = normalizeRecordingId(raw.replayRecordingId)
+  if (Array.isArray(raw.replayPlaylist)) {
+    config.replayPlaylist = raw.replayPlaylist
+      .map((entry) => normalizeRecordingId(entry))
+      .filter(Boolean)
+      .slice(0, 1_000)
+  }
+  if (!config.replayPlaylist.length && config.replayRecordingId) {
+    config.replayPlaylist = [config.replayRecordingId]
+  }
+  config.replayRecordingId = config.replayPlaylist[0] ?? ''
+  if (raw.replayOrder === 'random') config.replayOrder = raw.replayOrder
+  if (raw.replayLoop === 'one' || raw.replayLoop === 'all') config.replayLoop = raw.replayLoop
   config.replaySpeed = normalizeSpeed(raw.replaySpeed)
   if (config.mode === 'record' && !config.activeRecordingId) {
     config.activeRecordingId = `rec_${randomUUID().replace(/-/g, '')}`
@@ -169,7 +189,8 @@ export class RuntimeState {
   #config: RuntimeConfig = defaultConfig()
   #mutationQueue: Promise<void> = Promise.resolve()
   #lastRecordingOrder = 0
-  #replayRecordingId = ''
+  #replayKey = ''
+  #replaySequence: string[] = []
   #replayCursor = 0
   readonly dataDir: string
   readonly runtimeFile: string
@@ -203,6 +224,9 @@ export class RuntimeState {
     mode?: RuntimeMode
     recordingProtocol?: GatewayProtocol
     replayRecordingId?: string
+    replayPlaylist?: string[]
+    replayOrder?: ReplayOrder
+    replayLoop?: ReplayLoop
     replaySpeed?: ReplaySpeed
     enabledEndpoints?: GatewayProtocol[]
     upstreams?: Partial<Record<GatewayProtocol, Partial<UpstreamConfig>>>
@@ -213,11 +237,22 @@ export class RuntimeState {
       const next = this.snapshot()
       if (input.recordingProtocol) next.recordingProtocol = input.recordingProtocol
       if (input.replaySpeed !== undefined) next.replaySpeed = normalizeSpeed(input.replaySpeed)
-      if (input.replayRecordingId !== undefined) {
+      if (input.replayPlaylist !== undefined) {
+        if (!Array.isArray(input.replayPlaylist) || input.replayPlaylist.length > 1_000) {
+          throw new Error('Replay playlist must contain at most 1000 entries')
+        }
+        const playlist = input.replayPlaylist.map((entry) => normalizeRecordingId(entry))
+        if (playlist.some((entry) => !entry)) throw new Error('Invalid replay playlist entry')
+        next.replayPlaylist = playlist
+        next.replayRecordingId = playlist[0] ?? ''
+      } else if (input.replayRecordingId !== undefined) {
         const id = normalizeRecordingId(input.replayRecordingId)
         if (input.replayRecordingId && !id) throw new Error('Invalid replay recording id')
         next.replayRecordingId = id
+        next.replayPlaylist = id ? [id] : []
       }
+      if (input.replayOrder !== undefined) next.replayOrder = input.replayOrder
+      if (input.replayLoop !== undefined) next.replayLoop = input.replayLoop
       if (input.mode === 'record') {
         const startsNewRecording = this.#config.mode !== 'record'
           || this.#config.recordingProtocol !== next.recordingProtocol
@@ -226,8 +261,9 @@ export class RuntimeState {
         if (startsNewRecording) next.activeRecordingId = `rec_${randomUUID().replace(/-/g, '')}`
       } else if (input.mode === 'replay') {
         next.mode = 'replay'
-        if (input.replayRecordingId === undefined && this.#config.mode === 'record') {
+        if (input.replayRecordingId === undefined && input.replayPlaylist === undefined && this.#config.mode === 'record') {
           next.replayRecordingId = this.#config.activeRecordingId
+          next.replayPlaylist = next.replayRecordingId ? [next.replayRecordingId] : []
         }
       }
       if (input.enabledEndpoints) next.enabledEndpoints = [...input.enabledEndpoints]
@@ -239,7 +275,11 @@ export class RuntimeState {
       const persisted = normalizeConfig(next)
       await this.#persist(persisted)
       this.#config = persisted
-      if (input.mode === 'replay') this.resetReplay()
+      if (input.mode !== undefined
+        || input.replayRecordingId !== undefined
+        || input.replayPlaylist !== undefined
+        || input.replayOrder !== undefined
+        || input.replayLoop !== undefined) this.resetReplay()
       return this.snapshot()
     })
   }
@@ -254,26 +294,57 @@ export class RuntimeState {
     }
   }
 
-  claimReplay(recordingId: string, captureIds: string[]): { id: string; index: number; total: number } | undefined {
-    if (this.#config.mode !== 'replay' || this.#config.replayRecordingId !== recordingId) return undefined
-    if (this.#replayRecordingId !== recordingId) {
-      this.#replayRecordingId = recordingId
+  claimReplay(captureIds: string[]): { id: string; index: number; total: number } | undefined {
+    if (this.#config.mode !== 'replay') return undefined
+    this.#ensureReplay(captureIds)
+    if (this.#replayCursor >= this.#replaySequence.length) {
+      if (this.#config.replayLoop !== 'all' || !this.#replaySequence.length) return undefined
       this.#replayCursor = 0
+      if (this.#config.replayOrder === 'random') this.#shuffleReplaySequence()
     }
     const index = this.#replayCursor
-    const id = captureIds[index]
+    const id = this.#replaySequence[index]
     if (!id) return undefined
-    this.#replayCursor += 1
-    return { id, index, total: captureIds.length }
+    if (this.#config.replayLoop !== 'one') this.#replayCursor += 1
+    return { id, index, total: this.#replaySequence.length }
   }
 
-  replayPosition(recordingId = this.#config.replayRecordingId): number {
-    return this.#replayRecordingId === recordingId ? this.#replayCursor : 0
+  replayState(captureIds: string[]): { position: number; sequence: string[] } {
+    if (this.#config.mode === 'replay') this.#ensureReplay(captureIds)
+    return { position: this.#replayCursor, sequence: [...this.#replaySequence] }
+  }
+
+  replayPosition(): number {
+    return this.#replayCursor
   }
 
   private resetReplay(): void {
-    this.#replayRecordingId = this.#config.replayRecordingId
+    this.#replayKey = ''
+    this.#replaySequence = []
     this.#replayCursor = 0
+  }
+
+  #ensureReplay(captureIds: string[]): void {
+    const key = JSON.stringify([
+      this.#config.replayPlaylist,
+      this.#config.replayOrder,
+      this.#config.replayLoop,
+      captureIds,
+    ])
+    if (key === this.#replayKey) return
+    this.#replayKey = key
+    this.#replaySequence = [...captureIds]
+    this.#replayCursor = 0
+    if (this.#config.replayOrder === 'random') this.#shuffleReplaySequence()
+  }
+
+  #shuffleReplaySequence(): void {
+    for (let index = this.#replaySequence.length - 1; index > 0; index -= 1) {
+      const target = randomInt(index + 1)
+      const current = this.#replaySequence[index]
+      this.#replaySequence[index] = this.#replaySequence[target]
+      this.#replaySequence[target] = current
+    }
   }
 
   async updateBinding(

@@ -154,21 +154,48 @@ describe('RuntimeState mutations', () => {
 
     const replay = await runtime.update({ mode: 'replay' })
     expect(replay.replayRecordingId).toBe(recording.activeRecordingId)
-    expect(runtime.claimReplay(replay.replayRecordingId, ['cap_first123', 'cap_second12'])).toMatchObject({
+    expect(replay.replayPlaylist).toEqual([recording.activeRecordingId])
+    expect(runtime.claimReplay(['cap_first123', 'cap_second12'])).toMatchObject({
       id: 'cap_first123',
       index: 0,
       total: 2,
     })
-    expect(runtime.claimReplay(replay.replayRecordingId, ['cap_first123', 'cap_second12'])).toMatchObject({
+    expect(runtime.claimReplay(['cap_first123', 'cap_second12'])).toMatchObject({
       id: 'cap_second12',
       index: 1,
       total: 2,
     })
-    expect(runtime.claimReplay(replay.replayRecordingId, ['cap_first123', 'cap_second12'])).toBeUndefined()
+    expect(runtime.claimReplay(['cap_first123', 'cap_second12'])).toBeUndefined()
     expect(runtime.replayPosition()).toBe(2)
 
     await runtime.update({ mode: 'replay', replayRecordingId: replay.replayRecordingId })
     expect(runtime.replayPosition()).toBe(0)
+  })
+
+  it('supports shuffled, repeat-one, and repeat-all replay playlists', async () => {
+    const directory = await temporaryDirectory()
+    const runtime = new RuntimeState(directory)
+    await runtime.load()
+    const captures = ['cap_first123', 'cap_second12', 'cap_third123']
+
+    await runtime.update({
+      mode: 'replay',
+      replayPlaylist: ['rec_playlist123'],
+      replayOrder: 'random',
+      replayLoop: 'none',
+    })
+    const shuffled = captures.map(() => runtime.claimReplay(captures)!.id)
+    expect(new Set(shuffled)).toEqual(new Set(captures))
+    expect(runtime.claimReplay(captures)).toBeUndefined()
+
+    await runtime.update({ replayOrder: 'sequential', replayLoop: 'one' })
+    expect(runtime.claimReplay(captures)?.id).toBe(captures[0])
+    expect(runtime.claimReplay(captures)?.id).toBe(captures[0])
+    expect(runtime.replayPosition()).toBe(0)
+
+    await runtime.update({ replayLoop: 'all' })
+    expect(captures.map(() => runtime.claimReplay(captures)!.id)).toEqual(captures)
+    expect(runtime.claimReplay(captures)?.id).toBe(captures[0])
   })
 })
 
