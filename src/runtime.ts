@@ -4,7 +4,7 @@ import path from 'node:path'
 import { parseUpstreamBaseUrl } from './network.js'
 
 export type GatewayProtocol = 'openai-chat' | 'openai-responses' | 'anthropic-messages'
-export type RuntimeMode = 'builtin' | 'record' | 'replay'
+export type RuntimeMode = 'record' | 'replay'
 export type ReplaySpeed = number | 'instant'
 
 export interface ReplaySource {
@@ -26,6 +26,7 @@ export interface UpstreamConfig {
 
 export interface RuntimeConfig {
   mode: RuntimeMode
+  recordingProtocol: GatewayProtocol
   revision: number
   enabledEndpoints: GatewayProtocol[]
   upstreams: Record<GatewayProtocol, UpstreamConfig>
@@ -52,7 +53,8 @@ function defaultUpstream(protocol: GatewayProtocol): UpstreamConfig {
 
 function defaultConfig(): RuntimeConfig {
   return {
-    mode: 'builtin',
+    mode: 'replay',
+    recordingProtocol: 'openai-chat',
     revision: 1,
     enabledEndpoints: [...PROTOCOLS],
     upstreams: Object.fromEntries(PROTOCOLS.map((protocol) => [protocol, defaultUpstream(protocol)])) as RuntimeConfig['upstreams'],
@@ -95,7 +97,14 @@ function normalizeConfig(value: unknown): RuntimeConfig {
     bindings?: Record<string, unknown>
   } : {}
   const config = defaultConfig()
-  if (raw.mode === 'record' || raw.mode === 'replay' || raw.mode === 'builtin') config.mode = raw.mode
+  const rawMode = (raw as { mode?: unknown }).mode
+  if (rawMode === 'record' || rawMode === 'replay') config.mode = rawMode
+  // Built-in used to be a separate mode. Built-in scenarios are now replay sources.
+  if (rawMode === 'builtin') config.mode = 'replay'
+  if (typeof raw.recordingProtocol === 'string'
+    && PROTOCOLS.includes(raw.recordingProtocol as GatewayProtocol)) {
+    config.recordingProtocol = raw.recordingProtocol as GatewayProtocol
+  }
   if (typeof raw.revision === 'number' && Number.isInteger(raw.revision) && raw.revision > 0) {
     config.revision = raw.revision
   }
@@ -171,6 +180,7 @@ export class RuntimeState {
 
   async update(patch: {
     mode?: RuntimeMode
+    recordingProtocol?: GatewayProtocol
     enabledEndpoints?: GatewayProtocol[]
     upstreams?: Partial<Record<GatewayProtocol, Partial<UpstreamConfig>>>
   }, expectedRevision?: number): Promise<RuntimeConfig> {
@@ -179,6 +189,7 @@ export class RuntimeState {
       this.#assertRevision(expectedRevision)
       const next = this.snapshot()
       if (input.mode) next.mode = input.mode
+      if (input.recordingProtocol) next.recordingProtocol = input.recordingProtocol
       if (input.enabledEndpoints) next.enabledEndpoints = [...input.enabledEndpoints]
       for (const protocol of PROTOCOLS) {
         const upstream = input.upstreams?.[protocol]

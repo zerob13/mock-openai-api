@@ -13,6 +13,7 @@ const scenarios = ref<Scenario[]>([])
 const bindings = ref<ReplayBinding[]>([])
 const loading = ref(true)
 const saving = ref(false)
+const activating = ref(false)
 const error = ref('')
 const copied = ref(false)
 const form = ref({
@@ -36,6 +37,7 @@ const sourceOptions = computed(() => form.value.sourceType === 'capture'
       protocol: capture.protocol,
       exact: capture.protocol === form.value.protocol
         && Boolean(capture.stream) === form.value.stream
+        && captureMatchesEndpoint(capture.downstreamUrl, form.value.protocol)
         && capture.outcome === 'complete'
         && capture.bodyExact === true
         && capture.valid !== false
@@ -66,6 +68,17 @@ const diagnostics = computed(() => {
   ]
   return ['Scenario replay is semantic, not a byte-exact capture replay.']
 })
+
+function captureMatchesEndpoint(url: string | undefined, protocol: Protocol): boolean {
+  if (!url) return false
+  try {
+    const pathname = new URL(url).pathname.replace(/\/+$/, '')
+    return pathname === endpoints[protocol]
+      || (protocol === 'openai-chat' && pathname === '/chat/completions')
+  } catch {
+    return false
+  }
+}
 
 watch(() => [form.value.sourceType, form.value.protocol, form.value.stream], () => {
   if (!sourceOptions.value.some((item) => item.id === form.value.sourceId)) {
@@ -128,7 +141,21 @@ function testEndpoint(): void {
   void router.push({ name: 'test', query: { protocol: form.value.protocol, stream: String(form.value.stream) } })
 }
 
+async function activateReplay(): Promise<void> {
+  activating.value = true
+  try {
+    await runtime.refresh()
+    if (runtime.state.mode !== 'replay') await runtime.setMode('replay')
+    error.value = ''
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Could not activate replay'
+  } finally {
+    activating.value = false
+  }
+}
+
 onMounted(async () => {
+  await runtime.refresh()
   await load()
   const protocol = route.query.protocol
   if (protocol === 'openai-chat' || protocol === 'openai-responses' || protocol === 'anthropic-messages') {
@@ -156,6 +183,16 @@ onMounted(async () => {
     </header>
 
     <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
+
+    <article class="panel replay-mode-panel" :class="{ active: runtime.state.mode === 'replay' }">
+      <div>
+        <span class="eyebrow">Replay mode</span>
+        <h2>{{ runtime.state.mode === 'replay' ? 'Replay is serving active bindings' : 'Recording is currently active' }}</h2>
+        <p>Built-in examples are regular replay scenarios and can be replaced by a capture or an edited scenario below.</p>
+      </div>
+      <span v-if="runtime.state.mode === 'replay'" class="badge success">Active</span>
+      <var-button v-else :loading="activating" @click="activateReplay">Use replay mode</var-button>
+    </article>
 
     <article class="panel binding-builder">
       <header class="panel-header">
@@ -266,6 +303,10 @@ onMounted(async () => {
 
 <style scoped>
 .page-error { margin-bottom: 16px; }
+.replay-mode-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; padding: 18px; border-left: 5px solid var(--warning); }
+.replay-mode-panel.active { background: color-mix(in srgb, var(--warning-soft) 38%, var(--surface)); }
+.replay-mode-panel h2 { margin: 5px 0 4px; font-size: 17px; }
+.replay-mode-panel p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .binding-builder { overflow: hidden; }
 .binding-controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 18px; border-bottom: 1px solid var(--border); }
 .source-grid { display: grid; grid-template-columns: 1.08fr .92fr; min-height: 320px; }

@@ -7,7 +7,7 @@ import {
   captureToScenario,
   captureView,
 } from './capture-utils.js'
-import type { GatewayContext } from './app.js'
+import { API_ENDPOINTS, type GatewayContext } from './app.js'
 import { parseUpstreamBaseUrl, probeNetworkTarget } from './network.js'
 import {
   captureExactReplayEligibility,
@@ -29,6 +29,16 @@ export interface AdminAppOptions extends GatewayContext {
 
 function isProtocol(value: unknown): value is GatewayProtocol {
   return typeof value === 'string' && GATEWAY_PROTOCOLS.includes(value as GatewayProtocol)
+}
+
+function captureMatchesEndpoint(downstreamUrl: string, protocol: GatewayProtocol): boolean {
+  try {
+    const pathname = new URL(downstreamUrl).pathname.replace(/\/+$/, '')
+    return pathname === API_ENDPOINTS[protocol]
+      || (protocol === 'openai-chat' && pathname === '/chat/completions')
+  } catch {
+    return false
+  }
 }
 
 function routeParam(value: string | string[]): string {
@@ -161,6 +171,7 @@ async function runtimeView(options: AdminAppOptions): Promise<Record<string, unk
   const scenarios = await options.scenarios.list()
   return {
     mode: config.mode,
+    recordingProtocol: config.recordingProtocol,
     revision: config.revision,
     activeRequests: options.metrics.activeRequests,
     apiBaseUrl: options.apiBaseUrl,
@@ -195,6 +206,7 @@ async function bindingView(options: AdminAppOptions): Promise<Record<string, unk
           sourceTitle = capture.header.id
           const rawShapeMatches = capture.header.protocol === protocol
             && captureRequestStream(capture) === stream
+            && captureMatchesEndpoint(capture.header.downstreamUrl, protocol)
           if (rawShapeMatches) {
             const eligibility = captureExactReplayEligibility(capture, { targetProtocol: protocol })
             compatible = eligibility.eligible
@@ -266,8 +278,11 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
       response.status(409).json({ error: 'Runtime changed; refresh and try again' })
       return
     }
-    if (request.body.mode !== undefined && !['builtin', 'record', 'replay'].includes(request.body.mode)) {
-      throw new Error('Runtime mode must be builtin, record, or replay')
+    if (request.body.mode !== undefined && !['record', 'replay'].includes(request.body.mode)) {
+      throw new Error('Runtime mode must be record or replay')
+    }
+    if (request.body.recordingProtocol !== undefined && !isProtocol(request.body.recordingProtocol)) {
+      throw new Error('Recording protocol must be a supported upstream protocol')
     }
     let enabledEndpoints = current.enabledEndpoints
     if (request.body.enabledEndpoints !== undefined) {
@@ -295,14 +310,17 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
       }
     }
     const nextMode = request.body.mode ?? current.mode
+    const recordingProtocol: GatewayProtocol = request.body.recordingProtocol ?? current.recordingProtocol
     if (nextMode === 'record') {
-      for (const protocol of enabledEndpoints) {
-        const upstream = { ...current.upstreams[protocol], ...upstreams[protocol] }
-        if (!upstream.baseUrl) throw new Error(`Record mode requires an upstream for ${protocol}`)
+      const upstream = { ...current.upstreams[recordingProtocol], ...upstreams[recordingProtocol] }
+      if (!upstream.baseUrl) throw new Error(`Record mode requires an upstream for ${recordingProtocol}`)
+      if (!enabledEndpoints.includes(recordingProtocol)) {
+        throw new Error(`Record mode requires the ${recordingProtocol} endpoint to be enabled`)
       }
     }
     await options.runtime.update({
       mode: nextMode,
+      recordingProtocol,
       enabledEndpoints,
       upstreams,
     }, request.body.revision)
@@ -380,6 +398,7 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
       const capture = await options.captures.read(request.body.sourceId)
       const exact = capture.header.protocol === request.body.protocol
         && captureRequestStream(capture) === request.body.stream
+        && captureMatchesEndpoint(capture.header.downstreamUrl, request.body.protocol)
       if (exact) {
         const eligibility = captureExactReplayEligibility(capture, {
           targetProtocol: request.body.protocol,

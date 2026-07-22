@@ -64,17 +64,28 @@ function protocolError(protocol: GatewayProtocol, message: string, code = 'inval
 }
 
 export function resolveUpstreamUrl(baseUrl: string, protocol: GatewayProtocol): string {
-  if (!baseUrl) throw new Error(`No upstream configured for ${protocol}`)
+  return resolveUpstreamEndpoint(baseUrl, ENDPOINTS[protocol])
+}
+
+function resolveUpstreamEndpoint(baseUrl: string, endpoint: string): string {
+  if (!baseUrl) throw new Error('No recording upstream configured')
   const url = parseUpstreamBaseUrl(baseUrl)
 
-  const endpoint = ENDPOINTS[protocol]
-  const pathname = url.pathname.replace(/\/+$/, '')
+  let pathname = url.pathname.replace(/\/+$/, '')
   if (pathname.endsWith(endpoint)) {
     url.pathname = pathname
-  } else if (pathname.endsWith('/v1')) {
-    url.pathname = `${pathname}${endpoint.slice(3)}`
   } else {
-    url.pathname = `${pathname}${endpoint}`.replace(/\/{2,}/g, '/')
+    for (const knownEndpoint of Object.values(ENDPOINTS)) {
+      if (pathname.endsWith(knownEndpoint)) {
+        pathname = pathname.slice(0, -knownEndpoint.length)
+        break
+      }
+    }
+    if (pathname.endsWith('/v1')) {
+      url.pathname = `${pathname}${endpoint.slice(3)}`
+    } else {
+      url.pathname = `${pathname}${endpoint}`.replace(/\/{2,}/g, '/')
+    }
   }
   return url.toString()
 }
@@ -168,9 +179,6 @@ async function resolveScenario(
   protocol: GatewayProtocol,
   stream: boolean,
 ): Promise<{ scenario: ScenarioV1; speed: ReplaySpeed }> {
-  if (config.mode === 'builtin') {
-    return { scenario: await context.scenarios.read('builtin-markdown'), speed: 1 }
-  }
   const binding = config.bindings[protocol][stream ? 'stream' : 'nonstream']
   if (binding.kind === 'scenario') {
     return { scenario: await context.scenarios.read(binding.id), speed: binding.speed }
@@ -245,6 +253,14 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
       }
 
       if (config.mode === 'record') {
+        if (config.recordingProtocol !== protocol) {
+          response.status(409).json(protocolError(
+            protocol,
+            `Recording is active for ${config.recordingProtocol}; use ${ENDPOINTS[config.recordingProtocol]}`,
+            'recording_protocol_mismatch',
+          ))
+          return
+        }
         const upstream = config.upstreams[protocol]
         const upstreamUrl = resolveUpstreamUrl(upstream.baseUrl, protocol)
         let target
@@ -279,6 +295,7 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
         const capture = await context.captures.read(binding.id)
         const rawShapeMatches = capture.header.protocol === protocol
           && captureRequestStream(capture) === metadata.stream
+          && captureMatchesEndpoint(capture.header.downstreamUrl, protocol)
         if (rawShapeMatches && captureRequestIncludeUsage(capture) !== metadata.includeUsage) {
           response.status(409).json(protocolError(
             protocol,
@@ -340,6 +357,69 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
   }
 }
 
+function captureMatchesEndpoint(downstreamUrl: string, protocol: GatewayProtocol): boolean {
+  try {
+    const pathname = new URL(downstreamUrl).pathname.replace(/\/+$/, '')
+    return pathname === ENDPOINTS[protocol]
+      || (protocol === 'openai-chat' && pathname === '/chat/completions')
+  } catch {
+    return false
+  }
+}
+
+function modelsHandler(context: GatewayContext): RequestHandler {
+  return async (request, response, next) => {
+    const config = context.runtime.snapshot()
+    if (config.mode !== 'record') {
+      next()
+      return
+    }
+
+    const protocol = config.recordingProtocol
+    if (!config.enabledEndpoints.includes(protocol)) {
+      response.status(404).json(protocolError(protocol, `${protocol} endpoint is disabled`, 'not_found_error'))
+      return
+    }
+
+    context.metrics.activeRequests += 1
+    try {
+      const upstream = config.upstreams[protocol]
+      const upstreamUrl = resolveUpstreamEndpoint(upstream.baseUrl, '/v1/models')
+      let target
+      try {
+        target = await resolveNetworkTarget(upstreamUrl, upstream.allowPrivateNetwork)
+      } catch (error) {
+        await recordPreflightFailure(
+          request,
+          response,
+          protocol,
+          upstreamUrl,
+          context.capturesDirectory,
+          error instanceof Error ? error : new Error(String(error)),
+        )
+        return
+      }
+      await proxyAndRecord({
+        request,
+        response,
+        protocol,
+        upstreamUrl: target.url.toString(),
+        capturesDirectory: context.capturesDirectory,
+        lookup: target.lookup,
+      })
+    } catch (error) {
+      context.metrics.errorCount += 1
+      if (!response.headersSent) {
+        response.status(500).json(protocolError(protocol, (error as Error).message, 'gateway_error'))
+      } else if (!response.writableEnded) {
+        response.destroy(error instanceof Error ? error : undefined)
+      }
+    } finally {
+      context.metrics.activeRequests -= 1
+    }
+  }
+}
+
 export function createApiApp(context: GatewayContext): express.Express {
   const app = express()
   app.disable('x-powered-by')
@@ -348,6 +428,8 @@ export function createApiApp(context: GatewayContext): express.Express {
   app.post('/chat/completions', gatewayHandler('openai-chat', context))
   app.post('/v1/responses', gatewayHandler('openai-responses', context))
   app.post('/v1/messages', gatewayHandler('anthropic-messages', context))
+  app.get('/v1/models', modelsHandler(context))
+  app.get('/models', modelsHandler(context))
 
   app.use(express.json({ limit: '10mb' }))
   app.use(express.urlencoded({ extended: true }))

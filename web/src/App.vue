@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeStore } from './stores/runtime'
-import type { RuntimeMode } from './types'
 
 const runtime = useRuntimeStore()
 const route = useRoute()
@@ -20,26 +19,15 @@ const navigation = [
   { to: '/test', label: 'API Test', short: 'Test', icon: '↗' },
 ]
 
-const modeLabel = computed(() => ({ builtin: 'Built-in', record: 'Record', replay: 'Replay' })[runtime.state.mode])
-
-async function changeMode(event: Event): Promise<void> {
-  const next = (event.target as HTMLSelectElement).value as RuntimeMode
-  const previous = runtime.state.mode
-  if (next === previous) return
-  const message = next === 'record'
-    ? 'Record mode forwards requests to configured upstreams and stores complete captures. Continue?'
-    : `Switch all new requests to ${next} mode? Active requests keep their current mode.`
-  if (!window.confirm(message)) {
-    ;(event.target as HTMLSelectElement).value = previous
-    return
-  }
-  try {
-    await runtime.setMode(next)
-  } catch (cause) {
-    window.alert(cause instanceof Error ? cause.message : 'Mode update failed')
-    ;(event.target as HTMLSelectElement).value = previous
-  }
+const protocolLabels = {
+  'openai-chat': 'OpenAI Chat',
+  'openai-responses': 'OpenAI Responses',
+  'anthropic-messages': 'Anthropic Messages',
 }
+const modeLabel = computed(() => runtime.state.mode === 'record'
+  ? `Recording · ${protocolLabels[runtime.state.recordingProtocol]}`
+  : 'Replay')
+const modePage = computed(() => runtime.state.mode === 'record' ? '/recordings' : '/replay')
 
 function applyTheme(): void {
   document.documentElement.dataset.theme = dark.value ? 'dark' : 'light'
@@ -72,14 +60,9 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
       </router-link>
 
       <div class="header-actions">
-        <label class="mode-control">
-          <span>Mode</span>
-          <select :value="runtime.state.mode" :disabled="runtime.loading" @change="changeMode">
-            <option value="builtin">Built-in</option>
-            <option value="record">Record</option>
-            <option value="replay">Replay</option>
-          </select>
-        </label>
+        <router-link class="mode-status" :class="`is-${runtime.state.mode}`" :to="modePage">
+          <i aria-hidden="true"></i>{{ modeLabel }}
+        </router-link>
         <span class="connection" :class="runtime.connected ? 'is-ready' : 'is-error'">
           <i aria-hidden="true"></i>
           {{ runtime.connected ? `API ${runtime.state.apiBaseUrl.replace(/^https?:\/\//, '')}` : 'Admin offline' }}
@@ -104,7 +87,7 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
         </router-link>
       </nav>
       <div class="sidebar-mode">
-        <span class="eyebrow">Current mode</span>
+        <span class="eyebrow">Gateway state</span>
         <strong><i :class="`mode-dot mode-${runtime.state.mode}`"></i>{{ modeLabel }}</strong>
         <small>{{ runtime.state.activeRequests }} active request{{ runtime.state.activeRequests === 1 ? '' : 's' }}</small>
       </div>

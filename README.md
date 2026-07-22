@@ -12,7 +12,7 @@
 
 *[中文说明](README.zh.md) | English*
 
-A focused OpenAI and Anthropic API mock server that returns predefined or recorded test data without calling a real model in built-in/replay mode.
+A focused OpenAI and Anthropic API mock server that returns built-in or recorded test data without calling a real model in Replay mode.
 
 ## Record and replay console
 
@@ -21,7 +21,7 @@ The server now starts two listeners:
 - Mock API: `http://127.0.0.1:3000`
 - Admin console: `http://127.0.0.1:3001`
 
-Open the admin console to switch between Built-in, Record, and Replay modes. Record mode forwards the original request and key to the configured upstream while storing one credential-redacted `.llmcap.jsonl` file per request. Response bytes, SSE read chunks, headers, status, and relative timestamps are retained for body-exact same-protocol replay. Captures can also be decoded into protocol-neutral scenarios and replayed as OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages.
+Replay and Recording are the two runtime states. Built-in examples are ordinary replay scenarios. Start Recording from the Recordings page by choosing one configured OpenAI Chat, OpenAI Responses, or Anthropic Messages upstream; start Replay from the Replay page. Recording forwards the original request and key only to the selected same-protocol upstream while storing one credential-redacted `.llmcap.jsonl` file per request. `GET /v1/models` follows the selected recording upstream. Response bytes, SSE read chunks, headers, status, and relative timestamps are retained for body-exact same-protocol replay. Captures can also be decoded into protocol-neutral scenarios and replayed through any supported generation protocol.
 
 ```bash
 npm install
@@ -29,7 +29,7 @@ npm run build
 npm start
 ```
 
-Supported gateway endpoints are `POST /v1/chat/completions`, `POST /v1/responses`, and `POST /v1/messages`. Keep the client API key unchanged and point its base URL at this server. The full architecture, file schema, protocol mapping, security boundaries, and delivery plan are documented in [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md).
+Supported gateway endpoints are `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages`, and `GET /v1/models`. Keep the client API key unchanged and point its base URL at this server. The full architecture, file schema, protocol mapping, security boundaries, and delivery plan are documented in [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md).
 
 ## 🚀 Quick Start
 

@@ -4,7 +4,8 @@ import { getRuntime, patchRuntime } from '../api'
 import type { RuntimeMode, RuntimeState } from '../types'
 
 const fallbackRuntime: RuntimeState = {
-  mode: 'builtin',
+  mode: 'replay',
+  recordingProtocol: 'openai-chat',
   revision: 0,
   activeRequests: 0,
   apiBaseUrl: 'http://127.0.0.1:3000',

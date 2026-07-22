@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { captureToScenario, deleteCapture, getCapture, getCaptures, importCapture } from '../api'
+import { useRuntimeStore } from '../stores/runtime'
 import type { CaptureDetail, CaptureSummary, Protocol } from '../types'
 
 type DetailTab = 'summary' | 'request' | 'response' | 'parsed' | 'timeline' | 'raw'
 
 const route = useRoute()
 const router = useRouter()
+const runtime = useRuntimeStore()
 const captures = ref<CaptureSummary[]>([])
 const selected = ref<CaptureDetail | null>(null)
 const loading = ref(true)
@@ -18,6 +20,27 @@ const error = ref('')
 const activeTab = ref<DetailTab>('summary')
 const fileInput = ref<HTMLInputElement>()
 const filters = ref({ protocol: '', outcome: '', stream: '', search: '', partial: '' })
+const recordingProtocol = ref<Protocol>('openai-chat')
+const switchingMode = ref(false)
+
+const protocols: Record<Protocol, { label: string; endpoint: string }> = {
+  'openai-chat': { label: 'OpenAI Chat Completions', endpoint: '/v1/chat/completions' },
+  'openai-responses': { label: 'OpenAI Responses', endpoint: '/v1/responses' },
+  'anthropic-messages': { label: 'Anthropic Messages', endpoint: '/v1/messages' },
+}
+const configuredUpstreams = computed(() => runtime.state.upstreams.filter((upstream) => upstream.baseUrl))
+const selectedUpstream = computed(() => runtime.state.upstreams.find(
+  (upstream) => upstream.protocol === recordingProtocol.value,
+))
+const recordingReady = computed(() => Boolean(selectedUpstream.value?.baseUrl)
+  && runtime.state.enabledEndpoints.includes(recordingProtocol.value))
+const recordingEndpoint = computed(() => `${runtime.state.apiBaseUrl}${protocols[recordingProtocol.value].endpoint}`)
+
+watch(configuredUpstreams, (upstreams) => {
+  if (upstreams.length && !upstreams.some((upstream) => upstream.protocol === recordingProtocol.value)) {
+    recordingProtocol.value = upstreams[0].protocol
+  }
+})
 
 const filtered = computed(() => {
   const query = filters.value.search.trim().toLowerCase()
@@ -205,7 +228,38 @@ function bindForReplay(): void {
   })
 }
 
-onMounted(load)
+async function startRecording(): Promise<void> {
+  if (!recordingReady.value) return
+  switchingMode.value = true
+  try {
+    await runtime.update({ mode: 'record', recordingProtocol: recordingProtocol.value })
+    error.value = ''
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Could not start recording'
+  } finally {
+    switchingMode.value = false
+  }
+}
+
+async function stopRecording(): Promise<void> {
+  switchingMode.value = true
+  try {
+    await runtime.setMode('replay')
+    error.value = ''
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Could not switch to replay'
+  } finally {
+    switchingMode.value = false
+  }
+}
+
+onMounted(async () => {
+  await runtime.refresh()
+  recordingProtocol.value = configuredUpstreams.value.some(
+    (upstream) => upstream.protocol === runtime.state.recordingProtocol,
+  ) ? runtime.state.recordingProtocol : configuredUpstreams.value[0]?.protocol || runtime.state.recordingProtocol
+  await load()
+})
 </script>
 
 <template>
@@ -223,6 +277,39 @@ onMounted(load)
     </header>
 
     <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
+
+    <article class="panel recorder-panel" :class="{ 'is-recording': runtime.state.mode === 'record' }">
+      <div class="recorder-state">
+        <span class="eyebrow">Recording mode</span>
+        <h2>{{ runtime.state.mode === 'record' ? `Recording ${protocols[runtime.state.recordingProtocol].label}` : 'Choose an upstream to record' }}</h2>
+        <p v-if="runtime.state.mode === 'record'">Requests to the matching generation endpoint and <code>/v1/models</code> are passing through and being captured.</p>
+        <p v-else>Only the selected protocol is passed through. Other generation protocols remain unavailable until replay is active.</p>
+      </div>
+      <div class="recorder-controls">
+        <label class="field">
+          <span>Upstream API</span>
+          <select v-model="recordingProtocol" :disabled="switchingMode || !configuredUpstreams.length">
+            <option v-for="upstream in configuredUpstreams" :key="upstream.protocol" :value="upstream.protocol">
+              {{ protocols[upstream.protocol].label }} · {{ upstream.baseUrl }}
+            </option>
+          </select>
+          <small v-if="selectedUpstream?.baseUrl && !runtime.state.enabledEndpoints.includes(recordingProtocol)" class="error-text">Enable this protocol in Settings before recording.</small>
+          <small v-else-if="!configuredUpstreams.length" class="error-text">Configure at least one upstream API in Settings.</small>
+          <small v-else class="field-help mono">{{ recordingEndpoint }}</small>
+        </label>
+        <div class="button-row recorder-actions">
+          <router-link v-if="!configuredUpstreams.length" class="action-link small" to="/settings">Configure upstreams</router-link>
+          <var-button
+            v-if="runtime.state.mode !== 'record' || runtime.state.recordingProtocol !== recordingProtocol"
+            color="danger"
+            :disabled="!recordingReady"
+            :loading="switchingMode"
+            @click="startRecording"
+          >Start recording</var-button>
+          <var-button v-else outline :loading="switchingMode" @click="stopRecording">Stop &amp; use replay</var-button>
+        </div>
+      </div>
+    </article>
 
     <article class="panel filters-panel">
       <div class="panel-body toolbar">
@@ -387,6 +474,12 @@ onMounted(load)
 <style scoped>
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .page-error { margin-bottom: 14px; }
+.recorder-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, .8fr); gap: 24px; align-items: center; margin-bottom: 16px; padding: 19px; border-left: 5px solid var(--warning); }
+.recorder-panel.is-recording { border-color: var(--danger); background: color-mix(in srgb, var(--danger-soft) 42%, var(--surface)); }
+.recorder-state h2 { margin: 5px 0 6px; font-size: 17px; }
+.recorder-state p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.recorder-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.recorder-actions { min-height: 38px; }
 .filters-panel { margin-bottom: 16px; box-shadow: none; }
 .filter-search { min-width: 240px; flex: 1; }
 .recordings-grid { display: grid; grid-template-columns: minmax(520px, 1.2fr) minmax(380px, .8fr); gap: 16px; align-items: start; }
@@ -405,5 +498,8 @@ onMounted(load)
 @media (max-width: 1400px) {
   .recordings-grid { grid-template-columns: 1fr; }
   .recording-detail { position: static; max-height: none; }
+}
+@media (max-width: 900px) {
+  .recorder-panel, .recorder-controls { grid-template-columns: 1fr; }
 }
 </style>

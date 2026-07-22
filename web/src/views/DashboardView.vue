@@ -10,6 +10,11 @@ const scenarios = ref<Scenario[]>([])
 const bindings = ref<ReplayBinding[]>([])
 const loading = ref(true)
 const error = ref('')
+const protocolLabels = {
+  'openai-chat': 'OpenAI Chat',
+  'openai-responses': 'OpenAI Responses',
+  'anthropic-messages': 'Anthropic Messages',
+}
 
 const endpointRows = computed(() => [
   { protocol: 'openai-chat', path: '/v1/chat/completions', label: 'OpenAI Chat' },
@@ -19,6 +24,7 @@ const endpointRows = computed(() => [
   ...endpoint,
   enabled: runtime.state.enabledEndpoints.includes(endpoint.protocol as never),
   binding: bindings.value.find((item) => item.protocol === endpoint.protocol),
+  recording: runtime.state.mode === 'record' && runtime.state.recordingProtocol === endpoint.protocol,
 })))
 
 function duration(value?: number): string {
@@ -50,7 +56,7 @@ onMounted(load)
     <header class="page-heading">
       <div>
         <h1>Runtime overview</h1>
-        <p>One place to see the active gateway mode, replay bindings, and recent recording health.</p>
+        <p>See which upstream is recording or which replay bindings are serving requests.</p>
       </div>
       <div class="heading-actions">
         <var-button outline :loading="loading" @click="load">Refresh</var-button>
@@ -87,7 +93,7 @@ onMounted(load)
       <article class="panel">
         <header class="panel-header">
           <h2>API endpoints</h2>
-          <span class="panel-note">{{ runtime.state.mode }} mode</span>
+          <span class="badge" :class="runtime.state.mode === 'record' ? 'danger' : 'warning'">{{ runtime.state.mode === 'record' ? 'Recording' : 'Replay' }}</span>
         </header>
         <div class="table-scroll">
           <table class="data-table">
@@ -98,9 +104,9 @@ onMounted(load)
                   <strong>{{ row.label }}</strong>
                   <div class="muted mono">{{ row.path }}</div>
                 </td>
-                <td>{{ row.binding?.stream ? 'Stream' : row.binding ? 'Non-stream' : '—' }}</td>
-                <td class="truncate">{{ row.binding?.sourceTitle || row.binding?.sourceId || 'Built-in default' }}</td>
-                <td><span class="badge" :class="row.enabled ? 'success' : 'danger'">{{ row.enabled ? 'Ready' : 'Disabled' }}</span></td>
+                <td>{{ runtime.state.mode === 'record' ? (row.recording ? 'Pass-through' : 'Paused') : row.binding?.stream ? 'Stream' : row.binding ? 'Non-stream' : '—' }}</td>
+                <td class="truncate">{{ runtime.state.mode === 'record' ? (row.recording ? 'Selected upstream' : '—') : row.binding?.sourceTitle || row.binding?.sourceId || 'Built-in scenario' }}</td>
+                <td><span class="badge" :class="row.enabled && (runtime.state.mode !== 'record' || row.recording) ? 'success' : 'danger'">{{ !row.enabled ? 'Disabled' : runtime.state.mode === 'record' ? (row.recording ? 'Recording' : 'Paused') : 'Ready' }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -114,13 +120,13 @@ onMounted(load)
         </header>
         <div class="panel-body">
           <dl class="detail-list">
+            <dt>Gateway state</dt><dd>{{ runtime.state.mode === 'record' ? `Recording · ${protocolLabels[runtime.state.recordingProtocol]}` : 'Replay' }}</dd>
             <dt>API listener</dt><dd class="mono">{{ runtime.state.apiBaseUrl }}</dd>
-            <dt>Admin listener</dt><dd class="mono">{{ runtime.state.adminBaseUrl }}</dd>
             <dt>Data directory</dt><dd class="mono">{{ runtime.state.dataDir }}</dd>
             <dt>Revision</dt><dd>{{ runtime.state.revision }}</dd>
           </dl>
           <div class="button-row runtime-links">
-            <router-link class="action-link small" to="/replay">Manage replay</router-link>
+            <router-link class="action-link small" :to="runtime.state.mode === 'record' ? '/recordings' : '/replay'">Manage {{ runtime.state.mode === 'record' ? 'recording' : 'replay' }}</router-link>
             <router-link class="action-link small text" to="/settings">Runtime settings</router-link>
           </div>
         </div>
@@ -133,7 +139,7 @@ onMounted(load)
         </header>
         <div v-if="loading" class="loading-row"><var-loading size="small" /> Loading recordings</div>
         <div v-else-if="!captures.length" class="empty-state">
-          <div><strong>No recordings yet</strong>Switch to Record mode and send a request to create one.</div>
+          <div><strong>No recordings yet</strong>Choose an upstream on the Recordings page, then start recording.</div>
         </div>
         <div v-else class="table-scroll">
           <table class="data-table">

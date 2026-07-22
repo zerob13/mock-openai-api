@@ -19,7 +19,8 @@ const upstreamServers: Server[] = []
 const temporaryDirectories: string[] = []
 
 interface RuntimeView {
-  mode: 'builtin' | 'record' | 'replay'
+  mode: 'record' | 'replay'
+  recordingProtocol: 'openai-chat' | 'openai-responses' | 'anthropic-messages'
   revision: number
   activeRequests: number
   apiBaseUrl: string
@@ -155,11 +156,12 @@ async function updateMode(
   mode: RuntimeView['mode'],
   upstreams?: unknown[],
   enabledEndpoints?: string[],
+  recordingProtocol?: RuntimeView['recordingProtocol'],
 ): Promise<RuntimeView> {
   const runtime = await adminJson<RuntimeView>(servers, '/admin/api/runtime')
   return adminJson<RuntimeView>(servers, '/admin/api/runtime', {
     method: 'PATCH',
-    body: JSON.stringify({ revision: runtime.revision, mode, upstreams, enabledEndpoints }),
+    body: JSON.stringify({ revision: runtime.revision, mode, upstreams, enabledEndpoints, recordingProtocol }),
   })
 }
 
@@ -242,7 +244,8 @@ describe('startServer integration', () => {
 
     const runtime = await adminJson<RuntimeView>(servers, '/admin/api/runtime')
     expect(runtime).toMatchObject({
-      mode: 'builtin',
+      mode: 'replay',
+      recordingProtocol: 'openai-chat',
       revision: 1,
       activeRequests: 0,
       apiBaseUrl: servers.apiUrl,
@@ -360,6 +363,79 @@ describe('startServer integration', () => {
     const [filename] = (await readdir(join(servers.dataDir, 'captures')))
       .filter((value) => value.endsWith('.llmcap.jsonl'))
     expect(await readFile(join(servers.dataDir, 'captures', filename), 'utf8')).not.toContain(secret)
+  })
+
+  it('records through the selected Anthropic upstream and proxies its models endpoint', async () => {
+    const observed: Array<{ method: string; url: string; apiKey?: string }> = []
+    const upstream = createServer(async (request, response) => {
+      observed.push({
+        method: request.method || '',
+        url: request.url || '',
+        apiKey: typeof request.headers['x-api-key'] === 'string' ? request.headers['x-api-key'] : undefined,
+      })
+      for await (const _chunk of request) { /* Drain the request before responding. */ }
+      response.setHeader('content-type', 'application/json')
+      if (request.url?.startsWith('/v1/models')) {
+        response.end(JSON.stringify({ data: [{ id: 'claude-recorded' }] }))
+        return
+      }
+      response.end(JSON.stringify({
+        id: 'msg_recorded',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'from anthropic' }],
+        model: 'claude-recorded',
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 1, output_tokens: 2 },
+      }))
+    })
+    upstream.listen(0, '127.0.0.1')
+    await once(upstream, 'listening')
+    upstreamServers.push(upstream)
+    const address = upstream.address()
+    if (!address || typeof address === 'string') throw new Error('Upstream did not bind')
+
+    const servers = await startTestServer()
+    await updateMode(servers, 'record', [{
+      protocol: 'anthropic-messages',
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      allowPrivateNetwork: true,
+    }], undefined, 'anthropic-messages')
+
+    const mismatched = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(requestBody('openai-chat', false)),
+    })
+    expect(mismatched.status).toBe(409)
+    expect(await mismatched.json()).toMatchObject({
+      error: { code: 'recording_protocol_mismatch' },
+    })
+
+    const message = await fetch(`${servers.apiUrl}/v1/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': 'anthropic-secret' },
+      body: JSON.stringify(requestBody('anthropic-messages', false)),
+    })
+    expect(message.status).toBe(200)
+    expect(await message.json()).toMatchObject({ id: 'msg_recorded', type: 'message' })
+
+    const models = await fetch(`${servers.apiUrl}/v1/models?limit=10`, {
+      headers: { 'x-api-key': 'anthropic-secret' },
+    })
+    expect(models.status).toBe(200)
+    expect(await models.json()).toEqual({ data: [{ id: 'claude-recorded' }] })
+    expect(observed).toEqual([
+      { method: 'POST', url: '/v1/messages', apiKey: 'anthropic-secret' },
+      { method: 'GET', url: '/v1/models?limit=10', apiKey: 'anthropic-secret' },
+    ])
+
+    const captures = await waitForCaptures(servers, 2)
+    expect(captures.map((capture) => capture.protocol)).toEqual([
+      'anthropic-messages',
+      'anthropic-messages',
+    ])
+    expect(captures.map((capture) => capture.stream)).toEqual([false, false])
   })
 
   it('records a byte-exact raw proxy and replays it raw or transcoded', async () => {
@@ -598,6 +674,13 @@ describe('startServer integration', () => {
     )
 
     for (const testCase of cases) {
+      await updateMode(
+        servers,
+        'record',
+        undefined,
+        undefined,
+        testCase.protocol as RuntimeView['recordingProtocol'],
+      )
       const response = await fetch(`${servers.apiUrl}${testCase.path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -607,6 +690,7 @@ describe('startServer integration', () => {
       expect(await response.text()).toBe(testCase.body)
     }
 
+    await updateMode(servers, 'record', undefined, undefined, 'openai-chat')
     const jsonResponse = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -667,6 +751,7 @@ describe('startServer integration', () => {
       }),
     })).status).toBe(200)
 
+    await updateMode(servers, 'record', undefined, undefined, 'anthropic-messages')
     const anthropicError = await fetch(`${servers.apiUrl}/v1/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

@@ -9,13 +9,13 @@
 
 *中文说明 | [English](README.md)*
 
-一个面向 OpenAI 与 Anthropic 常用协议的模拟服务器；内置/重放模式无需调用真实模型，可返回预定义或已录制的测试数据。
+一个面向 OpenAI 与 Anthropic 常用协议的模拟服务器；重放模式无需调用真实模型，可返回内置或已录制的测试数据。
 
 ## 录制与重放后台
 
-启动后会同时提供 Mock API `http://127.0.0.1:3000` 和管理后台 `http://127.0.0.1:3001`。后台可以切换内置、录制、重放模式，管理 capture 文件，编辑文本、Markdown、tool call、usage 和 error 场景，并在 OpenAI Chat、OpenAI Responses、Anthropic Messages 三种协议间转换重放。
+启动后会同时提供 Mock API `http://127.0.0.1:3000` 和管理后台 `http://127.0.0.1:3001`。运行态只有录制与重放两种；内置样例就是默认的 replay scenario。录制在 Recordings 页面选择一个已配置的 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 上游后启动，重放在 Replay 页面启动。
 
-录制模式会把原请求和原 key 透传给后台配置的 upstream。每次请求独立保存为经过凭据脱敏的 `.llmcap.jsonl`，记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。相同协议可按原始 bytes 与延迟重放；跨协议通过语义场景重放。
+录制模式只把同协议原请求和原 key 透传给当前选中的 upstream，`GET /v1/models` 也跟随该上游透传。每次请求独立保存为经过凭据脱敏的 `.llmcap.jsonl`，记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。相同生成协议可按原始 bytes 与延迟重放；跨协议通过语义场景重放。
 
 ```bash
 npm install
@@ -23,7 +23,7 @@ npm run build
 npm start
 ```
 
-支持 `POST /v1/chat/completions`、`POST /v1/responses`、`POST /v1/messages`。客户端只需保持 API key 不变，把 base URL 指向本服务。完整架构、文件格式、协议映射和安全边界见 [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md)。
+支持 `POST /v1/chat/completions`、`POST /v1/responses`、`POST /v1/messages` 和 `GET /v1/models`。客户端只需保持 API key 不变，把 base URL 指向本服务。完整架构、文件格式、协议映射和安全边界见 [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md)。
 
 ## 🚀 快速开始
 

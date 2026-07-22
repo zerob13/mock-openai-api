@@ -9,7 +9,6 @@ import type {
 } from './types'
 
 const ADMIN_API = import.meta.env.VITE_ADMIN_API_BASE || '/admin/api'
-let adminToken = ''
 
 export class ApiError extends Error {
   constructor(
@@ -21,13 +20,8 @@ export class ApiError extends Error {
   }
 }
 
-export function setAdminToken(token: string): void {
-  adminToken = token.trim()
-}
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
-  if (adminToken) headers.set('Authorization', `Bearer ${adminToken}`)
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }

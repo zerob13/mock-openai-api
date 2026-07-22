@@ -1,8 +1,9 @@
 export type Protocol = 'openai-chat' | 'openai-responses' | 'anthropic-messages'
-export type RuntimeMode = 'builtin' | 'record' | 'replay'
+export type RuntimeMode = 'record' | 'replay'
 
 export interface RuntimeState {
   mode: RuntimeMode
+  recordingProtocol: Protocol
   revision: number
   activeRequests: number
   apiBaseUrl: string

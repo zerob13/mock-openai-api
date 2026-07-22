@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { checkUpstream, setAdminToken } from '../api'
+import { checkUpstream } from '../api'
 import { useRuntimeStore } from '../stores/runtime'
 import type { Protocol, UpstreamConfig } from '../types'
 
@@ -12,7 +12,6 @@ const protocols: Array<{ id: Protocol; label: string; placeholder: string }> = [
 ]
 const upstreams = ref<UpstreamConfig[]>([])
 const enabledEndpoints = ref<Protocol[]>([])
-const adminToken = ref('')
 const initialized = ref(false)
 const saving = ref(false)
 const checking = ref<Protocol | ''>('')
@@ -71,21 +70,6 @@ async function verify(upstream: UpstreamConfig): Promise<void> {
   }
 }
 
-async function applyToken(): Promise<void> {
-  setAdminToken(adminToken.value)
-  await runtime.refresh()
-  if (!runtime.error) {
-    populate()
-    success.value = 'Admin token applied in memory for this tab.'
-    error.value = ''
-  }
-}
-
-function clearToken(): void {
-  adminToken.value = ''
-  setAdminToken('')
-}
-
 onMounted(async () => {
   try {
     await runtime.refresh()
@@ -138,31 +122,16 @@ onMounted(async () => {
       </div>
     </article>
 
-    <div v-show="initialized" class="settings-grid">
-      <article class="panel settings-section">
-        <header class="panel-header"><h2>Runtime &amp; storage</h2></header>
-        <div class="panel-body settings-form">
-          <label class="field"><span>Data directory</span><input :value="runtime.state.dataDir" class="mono" disabled /><small class="field-help">Set at process startup. The web console cannot browse arbitrary server paths.</small></label>
-          <fieldset class="endpoint-options">
-            <legend>Enabled API endpoints</legend>
-            <label v-for="protocol in protocols" :key="protocol.id"><input type="checkbox" :checked="enabledEndpoints.includes(protocol.id)" @change="toggleEndpoint(protocol.id)" /> {{ protocol.label }}</label>
-          </fieldset>
-        </div>
-      </article>
-
-      <article class="panel settings-section">
-        <header class="panel-header"><h2>Admin access</h2><span class="badge success">Memory only</span></header>
-        <div class="panel-body settings-form">
-          <div class="callout">The admin listener is expected to bind to loopback. If a token is required, it is held only in this tab's JavaScript memory.</div>
-          <label class="field"><span>Admin bearer token</span><input v-model="adminToken" type="password" autocomplete="off" placeholder="Not stored" /></label>
-          <div class="button-row"><var-button size="small" outline @click="applyToken">Apply token</var-button><var-button size="small" text @click="clearToken">Clear</var-button></div>
-          <dl class="detail-list listener-list">
-            <dt>Admin listener</dt><dd class="mono">{{ runtime.state.adminBaseUrl }}</dd>
-            <dt>Runtime revision</dt><dd>{{ runtime.state.revision }}</dd>
-          </dl>
-        </div>
-      </article>
-    </div>
+    <article v-show="initialized" class="panel settings-section">
+      <header class="panel-header"><h2>Runtime &amp; storage</h2><span class="badge info">rev {{ runtime.state.revision }}</span></header>
+      <div class="panel-body settings-form runtime-settings">
+        <label class="field"><span>Data directory</span><input :value="runtime.state.dataDir" class="mono" disabled /><small class="field-help">Set at process startup. The web console cannot browse arbitrary server paths.</small></label>
+        <fieldset class="endpoint-options">
+          <legend>Enabled API endpoints</legend>
+          <label v-for="protocol in protocols" :key="protocol.id"><input type="checkbox" :checked="enabledEndpoints.includes(protocol.id)" @change="toggleEndpoint(protocol.id)" /> {{ protocol.label }}</label>
+        </fieldset>
+      </div>
+    </article>
   </section>
 </template>
 
@@ -176,17 +145,16 @@ onMounted(async () => {
 .upstream-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .upstream-card h3 { margin: 5px 0 0; font-size: 13px; }
 .check-message { margin: -4px 0 0; color: var(--muted); font-size: 10px; }
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .settings-form { display: grid; gap: 15px; }
+.runtime-settings { grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr); align-items: start; }
 .endpoint-options { display: grid; gap: 9px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 9px; }
 .endpoint-options legend { padding: 0 4px; color: var(--muted); font-size: 10px; font-weight: 650; }
 .endpoint-options label { display: flex; align-items: center; gap: 7px; font-size: 11px; }
 .endpoint-options input { width: 15px; min-height: 15px; accent-color: var(--accent); }
-.listener-list { margin-top: 5px; }
 @media (max-width: 1050px) {
   .upstream-grid { grid-template-columns: 1fr; }
   .upstream-card { border-right: 0; border-bottom: 1px solid var(--border); }
   .upstream-card:last-child { border-bottom: 0; }
 }
-@media (max-width: 720px) { .settings-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .runtime-settings { grid-template-columns: 1fr; } }
 </style>

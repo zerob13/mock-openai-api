@@ -121,6 +121,24 @@ describe('RuntimeState mutations', () => {
     expect(normalized).not.toContain('transport')
     expect(normalized).not.toContain('auth')
   })
+
+  it('migrates the removed builtin mode to replay', async () => {
+    const directory = await temporaryDirectory()
+    const runtime = new RuntimeState(directory)
+    await runtime.load()
+    const persisted = runtime.snapshot() as unknown as Record<string, unknown>
+    persisted.mode = 'builtin'
+    delete persisted.recordingProtocol
+    await writeFile(runtime.runtimeFile, `${JSON.stringify(persisted)}\n`)
+
+    const reloaded = new RuntimeState(directory)
+    await reloaded.load()
+    expect(reloaded.snapshot()).toMatchObject({
+      mode: 'replay',
+      recordingProtocol: 'openai-chat',
+    })
+    expect(await readFile(reloaded.runtimeFile, 'utf8')).not.toContain('"builtin"')
+  })
 })
 
 describe('server security and shutdown', () => {
