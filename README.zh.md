@@ -13,9 +13,11 @@
 
 ## 录制与重放后台
 
-启动后会同时提供 Mock API `http://127.0.0.1:3000` 和管理后台 `http://127.0.0.1:3001`。运行态只有录制与重放两种；内置样例就是默认的 replay scenario。录制在 Recordings 页面选择一个已配置的 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 上游后启动，重放在 Replay 页面启动。
+启动后会同时提供 Mock API `http://127.0.0.1:3000` 和管理后台 `http://127.0.0.1:3001`。Recorder 是主界面：选择任意一个已配置的 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 上游，按下录制，发送任意数量的请求，再按停止。每个完成中或已完成的请求都会实时显示为一行。
 
-录制模式只把同协议原请求和原 key 透传给当前选中的 upstream，`GET /v1/models` 也跟随该上游透传。每次请求独立保存为经过凭据脱敏的 `.llmcap.jsonl`，记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。相同生成协议可按原始 bytes 与延迟重放；跨协议通过语义场景重放。
+录制模式只把同协议原请求和原 key 透传给当前选中的 upstream，`GET /v1/models` 也跟随该上游透传。每次请求仍独立保存为经过凭据脱敏的 `.llmcap.jsonl`，额外标记所属录制和顺序；文件记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。
+
+停止后该次录制会自动装入重放。每个受支持的下游请求都会原子消费下一条响应，不匹配 method、path、body、model 或 prompt；五条录制只响应前五次请求，第六次返回 `recording_exhausted`，再次点击 Replay 会归零游标。同协议保留原始 bytes、chunk、headers、状态与延迟；从另一生成协议入口请求时，通过 scenario compiler 转换响应。没有装入录制时，内置样例和手工场景仍作为默认重放数据。
 
 ```bash
 npm install

@@ -3,6 +3,7 @@ import type { ServerResponse } from 'node:http'
 import cors from 'cors'
 import express, { type Request, type RequestHandler, type Response } from 'express'
 import {
+  captureIsStream,
   captureRequestIncludeUsage,
   captureRequestStream,
   captureToScenario,
@@ -197,6 +198,7 @@ async function recordPreflightFailure(
   upstreamUrl: string,
   capturesDirectory: string,
   error: Error,
+  recording?: { id: string; order: number },
 ): Promise<void> {
   const downstreamUrl = `http://${request.headers.host ?? 'localhost'}${request.originalUrl}`
   const writer = await createCaptureWriter({
@@ -211,6 +213,7 @@ async function recordPreflightFailure(
       url: downstreamUrl,
     },
     credentialSecrets: extractCredentialSecrets(request.rawHeaders, downstreamUrl),
+    recording,
   })
   try {
     for await (const value of request) {
@@ -240,6 +243,49 @@ async function recordPreflightFailure(
   }
 }
 
+async function replayNextRecordingResponse(
+  context: GatewayContext,
+  protocol: GatewayProtocol,
+  response: Response,
+  signal: AbortSignal,
+  originNs: bigint,
+  rawOnly = false,
+): Promise<void> {
+  const config = context.runtime.snapshot()
+  const recordingId = config.replayRecordingId
+  const captures = await context.captures.listRecording(recordingId)
+  const next = context.runtime.claimReplay(recordingId, captures.map((capture) => capture.id))
+  if (!next) {
+    const position = context.runtime.replayPosition(recordingId)
+    response.status(409).json(protocolError(
+      protocol,
+      `Recording exhausted (${position}/${captures.length}); start replay again to rewind`,
+      'recording_exhausted',
+    ))
+    return
+  }
+  const capture = await context.captures.read(next.id)
+  if (!rawOnly && capture.header.protocol !== protocol
+    && captureMatchesEndpoint(capture.header.downstreamUrl, capture.header.protocol)) {
+    const stream = captureRequestStream(capture) ?? captureIsStream(capture)
+    const compiled = compileScenario(protocol, captureToScenario(capture), {
+      stream,
+      includeUsage: captureRequestIncludeUsage(capture) ?? false,
+      model: 'mock-model',
+      invocationId: randomUUID(),
+      createdAt: Math.floor(Date.now() / 1000),
+    })
+    await sendCompiled(response, compiled, config.replaySpeed, originNs, signal)
+    return
+  }
+  await replayCaptureResponse(capture, response, {
+    speed: config.replaySpeed,
+    signal,
+    startTimeNs: originNs,
+    allowIncomplete: true,
+  })
+}
+
 function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): RequestHandler {
   return async (request, response) => {
     const originNs = process.hrtime.bigint()
@@ -261,6 +307,11 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
           ))
           return
         }
+        const recording = context.runtime.claimRecording()
+        if (!recording || recording.protocol !== protocol) {
+          response.status(409).json(protocolError(protocol, 'Recording state changed; retry the request', 'recording_changed'))
+          return
+        }
         const upstream = config.upstreams[protocol]
         const upstreamUrl = resolveUpstreamUrl(upstream.baseUrl, protocol)
         let target
@@ -274,6 +325,7 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
             upstreamUrl,
             context.capturesDirectory,
             error instanceof Error ? error : new Error(String(error)),
+            recording,
           )
           return
         }
@@ -284,11 +336,16 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
           upstreamUrl: target.url.toString(),
           capturesDirectory: context.capturesDirectory,
           lookup: target.lookup,
+          recording,
         })
         return
       }
 
       const body = await readRawBody(request)
+      if (config.replayRecordingId) {
+        await replayNextRecordingResponse(context, protocol, response, signal, originNs)
+        return
+      }
       const metadata = requestMetadata(body)
       const binding = config.bindings[protocol][metadata.stream ? 'stream' : 'nonstream']
       if (config.mode === 'replay' && binding.kind === 'capture') {
@@ -370,6 +427,29 @@ function captureMatchesEndpoint(downstreamUrl: string, protocol: GatewayProtocol
 function modelsHandler(context: GatewayContext): RequestHandler {
   return async (request, response, next) => {
     const config = context.runtime.snapshot()
+    if (config.mode === 'replay' && config.replayRecordingId) {
+      context.metrics.activeRequests += 1
+      try {
+        await replayNextRecordingResponse(
+          context,
+          config.recordingProtocol,
+          response,
+          abortSignal(request, response),
+          process.hrtime.bigint(),
+          true,
+        )
+      } catch (error) {
+        context.metrics.errorCount += 1
+        if (!response.headersSent) {
+          response.status(500).json(protocolError(config.recordingProtocol, (error as Error).message, 'gateway_error'))
+        } else if (!response.writableEnded) {
+          response.destroy(error instanceof Error ? error : undefined)
+        }
+      } finally {
+        context.metrics.activeRequests -= 1
+      }
+      return
+    }
     if (config.mode !== 'record') {
       next()
       return
@@ -383,6 +463,11 @@ function modelsHandler(context: GatewayContext): RequestHandler {
 
     context.metrics.activeRequests += 1
     try {
+      const recording = context.runtime.claimRecording()
+      if (!recording || recording.protocol !== protocol) {
+        response.status(409).json(protocolError(protocol, 'Recording state changed; retry the request', 'recording_changed'))
+        return
+      }
       const upstream = config.upstreams[protocol]
       const upstreamUrl = resolveUpstreamEndpoint(upstream.baseUrl, '/v1/models')
       let target
@@ -396,6 +481,7 @@ function modelsHandler(context: GatewayContext): RequestHandler {
           upstreamUrl,
           context.capturesDirectory,
           error instanceof Error ? error : new Error(String(error)),
+          recording,
         )
         return
       }
@@ -406,6 +492,7 @@ function modelsHandler(context: GatewayContext): RequestHandler {
         upstreamUrl: target.url.toString(),
         capturesDirectory: context.capturesDirectory,
         lookup: target.lookup,
+        recording,
       })
     } catch (error) {
       context.metrics.errorCount += 1

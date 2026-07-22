@@ -4,6 +4,11 @@ export type RuntimeMode = 'record' | 'replay'
 export interface RuntimeState {
   mode: RuntimeMode
   recordingProtocol: Protocol
+  activeRecordingId: string
+  replayRecordingId: string
+  replaySpeed: number | 'instant'
+  replayPosition: number
+  replayTotal: number
   revision: number
   activeRequests: number
   apiBaseUrl: string
@@ -28,6 +33,8 @@ export interface UpstreamConfig {
 export interface CaptureSummary {
   id: string
   protocol: Protocol
+  recordingId?: string
+  recordingOrder?: number
   createdAt: string
   outcome: string
   stream: boolean
@@ -45,6 +52,16 @@ export interface CaptureSummary {
   valid?: boolean
   partial?: boolean
   title?: string
+}
+
+export interface RecordingSummary {
+  id: string
+  createdAt: string
+  protocol: Protocol
+  requestCount: number
+  completeCount: number
+  active: boolean
+  requests: CaptureSummary[]
 }
 
 export interface CaptureDetail extends CaptureSummary {

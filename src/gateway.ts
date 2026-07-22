@@ -171,6 +171,7 @@ export interface ProxyRecordOptions {
   upstreamUrl: string
   capturesDirectory: string
   lookup?: LookupFunction
+  recording?: { id: string; order: number }
 }
 
 export async function proxyAndRecord(options: ProxyRecordOptions): Promise<void> {
@@ -200,6 +201,7 @@ export async function proxyAndRecord(options: ProxyRecordOptions): Promise<void>
       url: downstreamUrl,
     },
     credentialSecrets: extractCredentialSecrets(request.rawHeaders, downstreamUrl),
+    recording: options.recording,
   })
 
   const transport = upstreamUrl.protocol === 'https:' ? https : http

@@ -21,6 +21,10 @@ const temporaryDirectories: string[] = []
 interface RuntimeView {
   mode: 'record' | 'replay'
   recordingProtocol: 'openai-chat' | 'openai-responses' | 'anthropic-messages'
+  activeRecordingId: string
+  replayRecordingId: string
+  replayPosition: number
+  replayTotal: number
   revision: number
   activeRequests: number
   apiBaseUrl: string
@@ -32,6 +36,8 @@ interface RuntimeView {
 
 interface CaptureView {
   id: string
+  recordingId?: string
+  recordingOrder?: number
   partial: boolean
   protocol: string
   outcome: string
@@ -436,6 +442,46 @@ describe('startServer integration', () => {
       'anthropic-messages',
     ])
     expect(captures.map((capture) => capture.stream)).toEqual([false, false])
+
+    const recordingId = (await adminJson<RuntimeView>(servers, '/admin/api/runtime')).activeRecordingId
+    const recordings = await adminJson<Array<{ id: string; requestCount: number; requests: CaptureView[] }>>(
+      servers,
+      '/admin/api/recordings',
+    )
+    expect(recordings).toContainEqual(expect.objectContaining({ id: recordingId, requestCount: 2 }))
+    expect(recordings.find((recording) => recording.id === recordingId)?.requests.map(
+      (capture) => capture.recordingOrder,
+    )).toEqual([...recordings.find((recording) => recording.id === recordingId)!.requests]
+      .map((capture) => capture.recordingOrder)
+      .sort((left, right) => Number(left) - Number(right)))
+
+    const replayRuntime = await updateMode(servers, 'replay')
+    expect(replayRuntime).toMatchObject({ replayRecordingId: recordingId, replayPosition: 0, replayTotal: 2 })
+
+    const firstReplay = await fetch(`${servers.apiUrl}/v1/responses`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'this request is deliberately unrelated',
+    })
+    expect(firstReplay.status).toBe(200)
+    const firstReplayBody = await firstReplay.json()
+    expect(firstReplayBody).toMatchObject({ object: 'response' })
+    expect(JSON.stringify(firstReplayBody)).toContain('from anthropic')
+
+    const secondReplay = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      body: 'not json',
+    })
+    expect(secondReplay.status).toBe(200)
+    expect(await secondReplay.json()).toEqual({ data: [{ id: 'claude-recorded' }] })
+
+    const exhausted = await fetch(`${servers.apiUrl}/v1/messages`, { method: 'POST', body: 'anything' })
+    expect(exhausted.status).toBe(409)
+    expect(await exhausted.json()).toMatchObject({ error: { type: 'recording_exhausted' } })
+    expect(await adminJson<RuntimeView>(servers, '/admin/api/runtime')).toMatchObject({
+      replayPosition: 2,
+      replayTotal: 2,
+    })
   })
 
   it('records a byte-exact raw proxy and replays it raw or transcoded', async () => {
@@ -577,14 +623,14 @@ describe('startServer integration', () => {
     expect(sameProtocol.headers.get('x-upstream-id')).toBe('raw-1')
     expect(Buffer.from(await sameProtocol.arrayBuffer())).toEqual(upstreamResponse)
 
-    const mismatchedOptions = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
+    const exhausted = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: 'anything', messages: [], stream: true }),
     })
-    expect(mismatchedOptions.status).toBe(409)
-    expect(await mismatchedOptions.json()).toMatchObject({
-      error: { code: 'replay_options_mismatch' },
+    expect(exhausted.status).toBe(409)
+    expect(await exhausted.json()).toMatchObject({
+      error: { code: 'recording_exhausted' },
     })
 
     bindings = await bindCapture(servers, 'anthropic-messages', capture.id)
@@ -594,6 +640,11 @@ describe('startServer integration', () => {
       sourceType: 'capture',
       sourceId: capture.id,
     }))
+    const runtime = await adminJson<RuntimeView>(servers, '/admin/api/runtime')
+    await adminJson<RuntimeView>(servers, '/admin/api/runtime', {
+      method: 'PATCH',
+      body: JSON.stringify({ revision: runtime.revision, replayRecordingId: '' }),
+    })
     const transcoded = await fetch(`${servers.apiUrl}/v1/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

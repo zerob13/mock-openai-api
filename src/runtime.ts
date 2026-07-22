@@ -27,6 +27,9 @@ export interface UpstreamConfig {
 export interface RuntimeConfig {
   mode: RuntimeMode
   recordingProtocol: GatewayProtocol
+  activeRecordingId: string
+  replayRecordingId: string
+  replaySpeed: ReplaySpeed
   revision: number
   enabledEndpoints: GatewayProtocol[]
   upstreams: Record<GatewayProtocol, UpstreamConfig>
@@ -55,6 +58,9 @@ function defaultConfig(): RuntimeConfig {
   return {
     mode: 'replay',
     recordingProtocol: 'openai-chat',
+    activeRecordingId: '',
+    replayRecordingId: '',
+    replaySpeed: 1,
     revision: 1,
     enabledEndpoints: [...PROTOCOLS],
     upstreams: Object.fromEntries(PROTOCOLS.map((protocol) => [protocol, defaultUpstream(protocol)])) as RuntimeConfig['upstreams'],
@@ -90,6 +96,12 @@ function normalizeBaseUrl(value: unknown): string {
   }
 }
 
+function normalizeRecordingId(value: unknown, active = false): string {
+  if (typeof value !== 'string') return ''
+  const pattern = active ? /^rec_[A-Za-z0-9_-]{8,128}$/ : /^(?:rec|cap)_[A-Za-z0-9_-]{8,128}$/
+  return pattern.test(value) ? value : ''
+}
+
 function normalizeConfig(value: unknown): RuntimeConfig {
   const raw = value && typeof value === 'object' ? value as Partial<RuntimeConfig> & {
     speed?: unknown
@@ -104,6 +116,12 @@ function normalizeConfig(value: unknown): RuntimeConfig {
   if (typeof raw.recordingProtocol === 'string'
     && PROTOCOLS.includes(raw.recordingProtocol as GatewayProtocol)) {
     config.recordingProtocol = raw.recordingProtocol as GatewayProtocol
+  }
+  config.activeRecordingId = normalizeRecordingId(raw.activeRecordingId, true)
+  config.replayRecordingId = normalizeRecordingId(raw.replayRecordingId)
+  config.replaySpeed = normalizeSpeed(raw.replaySpeed)
+  if (config.mode === 'record' && !config.activeRecordingId) {
+    config.activeRecordingId = `rec_${randomUUID().replace(/-/g, '')}`
   }
   if (typeof raw.revision === 'number' && Number.isInteger(raw.revision) && raw.revision > 0) {
     config.revision = raw.revision
@@ -150,6 +168,9 @@ function normalizeConfig(value: unknown): RuntimeConfig {
 export class RuntimeState {
   #config: RuntimeConfig = defaultConfig()
   #mutationQueue: Promise<void> = Promise.resolve()
+  #lastRecordingOrder = 0
+  #replayRecordingId = ''
+  #replayCursor = 0
   readonly dataDir: string
   readonly runtimeFile: string
 
@@ -181,6 +202,8 @@ export class RuntimeState {
   async update(patch: {
     mode?: RuntimeMode
     recordingProtocol?: GatewayProtocol
+    replayRecordingId?: string
+    replaySpeed?: ReplaySpeed
     enabledEndpoints?: GatewayProtocol[]
     upstreams?: Partial<Record<GatewayProtocol, Partial<UpstreamConfig>>>
   }, expectedRevision?: number): Promise<RuntimeConfig> {
@@ -188,8 +211,25 @@ export class RuntimeState {
     return this.#serialize(async () => {
       this.#assertRevision(expectedRevision)
       const next = this.snapshot()
-      if (input.mode) next.mode = input.mode
       if (input.recordingProtocol) next.recordingProtocol = input.recordingProtocol
+      if (input.replaySpeed !== undefined) next.replaySpeed = normalizeSpeed(input.replaySpeed)
+      if (input.replayRecordingId !== undefined) {
+        const id = normalizeRecordingId(input.replayRecordingId)
+        if (input.replayRecordingId && !id) throw new Error('Invalid replay recording id')
+        next.replayRecordingId = id
+      }
+      if (input.mode === 'record') {
+        const startsNewRecording = this.#config.mode !== 'record'
+          || this.#config.recordingProtocol !== next.recordingProtocol
+          || !this.#config.activeRecordingId
+        next.mode = 'record'
+        if (startsNewRecording) next.activeRecordingId = `rec_${randomUUID().replace(/-/g, '')}`
+      } else if (input.mode === 'replay') {
+        next.mode = 'replay'
+        if (input.replayRecordingId === undefined && this.#config.mode === 'record') {
+          next.replayRecordingId = this.#config.activeRecordingId
+        }
+      }
       if (input.enabledEndpoints) next.enabledEndpoints = [...input.enabledEndpoints]
       for (const protocol of PROTOCOLS) {
         const upstream = input.upstreams?.[protocol]
@@ -199,8 +239,41 @@ export class RuntimeState {
       const persisted = normalizeConfig(next)
       await this.#persist(persisted)
       this.#config = persisted
+      if (input.mode === 'replay') this.resetReplay()
       return this.snapshot()
     })
+  }
+
+  claimRecording(): { id: string; order: number; protocol: GatewayProtocol } | undefined {
+    if (this.#config.mode !== 'record' || !this.#config.activeRecordingId) return undefined
+    this.#lastRecordingOrder = Math.max(Date.now() * 1000, this.#lastRecordingOrder + 1)
+    return {
+      id: this.#config.activeRecordingId,
+      order: this.#lastRecordingOrder,
+      protocol: this.#config.recordingProtocol,
+    }
+  }
+
+  claimReplay(recordingId: string, captureIds: string[]): { id: string; index: number; total: number } | undefined {
+    if (this.#config.mode !== 'replay' || this.#config.replayRecordingId !== recordingId) return undefined
+    if (this.#replayRecordingId !== recordingId) {
+      this.#replayRecordingId = recordingId
+      this.#replayCursor = 0
+    }
+    const index = this.#replayCursor
+    const id = captureIds[index]
+    if (!id) return undefined
+    this.#replayCursor += 1
+    return { id, index, total: captureIds.length }
+  }
+
+  replayPosition(recordingId = this.#config.replayRecordingId): number {
+    return this.#replayRecordingId === recordingId ? this.#replayCursor : 0
+  }
+
+  private resetReplay(): void {
+    this.#replayRecordingId = this.#config.replayRecordingId
+    this.#replayCursor = 0
   }
 
   async updateBinding(

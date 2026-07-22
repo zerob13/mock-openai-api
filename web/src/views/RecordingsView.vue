@@ -1,40 +1,53 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { captureToScenario, deleteCapture, getCapture, getCaptures, importCapture } from '../api'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  captureToScenario,
+  deleteCapture,
+  getCapture,
+  getRecordings,
+  importCapture,
+} from '../api'
 import { useRuntimeStore } from '../stores/runtime'
-import type { CaptureDetail, CaptureSummary, Protocol } from '../types'
+import type { CaptureDetail, CaptureSummary, Protocol, RecordingSummary } from '../types'
 
-type DetailTab = 'summary' | 'request' | 'response' | 'parsed' | 'timeline' | 'raw'
-
-const route = useRoute()
-const router = useRouter()
 const runtime = useRuntimeStore()
-const captures = ref<CaptureSummary[]>([])
-const selected = ref<CaptureDetail | null>(null)
-const loading = ref(true)
-const detailLoading = ref(false)
-const importing = ref(false)
-const converting = ref(false)
-const error = ref('')
-const activeTab = ref<DetailTab>('summary')
-const fileInput = ref<HTMLInputElement>()
-const filters = ref({ protocol: '', outcome: '', stream: '', search: '', partial: '' })
+const recordings = ref<RecordingSummary[]>([])
 const recordingProtocol = ref<Protocol>('openai-chat')
-const switchingMode = ref(false)
+const selectedRecordingId = ref('')
+const selectedCapture = ref<CaptureDetail | null>(null)
+const loading = ref(true)
+const switching = ref(false)
+const importing = ref(false)
+const detailLoading = ref(false)
+const error = ref('')
+const fileInput = ref<HTMLInputElement>()
+let pollTimer: number | undefined
+let refreshing = false
 
 const protocols: Record<Protocol, { label: string; endpoint: string }> = {
-  'openai-chat': { label: 'OpenAI Chat Completions', endpoint: '/v1/chat/completions' },
+  'openai-chat': { label: 'OpenAI Chat', endpoint: '/v1/chat/completions' },
   'openai-responses': { label: 'OpenAI Responses', endpoint: '/v1/responses' },
   'anthropic-messages': { label: 'Anthropic Messages', endpoint: '/v1/messages' },
 }
+
 const configuredUpstreams = computed(() => runtime.state.upstreams.filter((upstream) => upstream.baseUrl))
 const selectedUpstream = computed(() => runtime.state.upstreams.find(
   (upstream) => upstream.protocol === recordingProtocol.value,
 ))
 const recordingReady = computed(() => Boolean(selectedUpstream.value?.baseUrl)
   && runtime.state.enabledEndpoints.includes(recordingProtocol.value))
-const recordingEndpoint = computed(() => `${runtime.state.apiBaseUrl}${protocols[recordingProtocol.value].endpoint}`)
+const activeRecording = computed(() => recordings.value.find(
+  (recording) => recording.id === runtime.state.activeRecordingId,
+))
+const shownRecording = computed(() => {
+  if (runtime.state.mode === 'record') return activeRecording.value
+  return recordings.value.find((recording) => recording.id === selectedRecordingId.value)
+    || recordings.value.find((recording) => recording.id === runtime.state.replayRecordingId)
+    || recordings.value[0]
+})
+const replayingShownRecording = computed(() => runtime.state.mode === 'replay'
+  && shownRecording.value?.id === runtime.state.replayRecordingId)
+const endpoint = computed(() => `${runtime.state.apiBaseUrl}${protocols[recordingProtocol.value].endpoint}`)
 
 watch(configuredUpstreams, (upstreams) => {
   if (upstreams.length && !upstreams.some((upstream) => upstream.protocol === recordingProtocol.value)) {
@@ -42,146 +55,97 @@ watch(configuredUpstreams, (upstreams) => {
   }
 })
 
-const filtered = computed(() => {
-  const query = filters.value.search.trim().toLowerCase()
-  return captures.value.filter((item) => {
-    if (filters.value.protocol && item.protocol !== filters.value.protocol) return false
-    if (filters.value.outcome && item.outcome !== filters.value.outcome) return false
-    if (filters.value.stream && String(item.stream) !== filters.value.stream) return false
-    if (filters.value.partial === 'exact' && (item.partial || item.outcome !== 'complete' || item.bodyExact !== true)) return false
-    if (filters.value.partial === 'inexact' && (item.partial || item.bodyExact !== false)) return false
-    if (filters.value.partial === 'partial' && !item.partial) return false
-    return !query || [item.id, item.title, item.downstreamUrl, item.upstreamUrl, item.protocol]
-      .some((value) => String(value || '').toLowerCase().includes(query))
-  })
-})
-
-const timeline = computed(() => selected.value?.timeline || selected.value?.records || [])
-const parsedResponse = computed(() => {
-  const response = selected.value?.response
-  if (!response || typeof response !== 'object') return response
-  const body = (response as Record<string, unknown>).bodyUtf8
-  if (typeof body !== 'string') return response
-  let parsed: unknown = body
+function pathOf(capture: CaptureSummary): string {
   try {
-    parsed = selected.value?.stream ? parseSse(body) : JSON.parse(body)
+    const url = new URL(capture.downstreamUrl || '')
+    return `${url.pathname}${url.search}`
   } catch {
-    // Keep non-JSON provider payloads visible as text.
+    return capture.downstreamUrl || 'Captured request'
   }
-  return { ...(response as Record<string, unknown>), body: parsed }
-})
+}
 
-function parseSse(value: string): Array<Record<string, unknown>> {
-  const events: Array<Record<string, unknown>> = []
-  let event = 'message'
-  let data: string[] = []
-  let id: string | undefined
-  let retry: number | undefined
-  const dispatch = (): void => {
-    if (!data.length) {
-      event = 'message'
-      id = undefined
-      retry = undefined
-      return
-    }
-    const raw = data.join('\n')
-    let payload: unknown = raw
-    if (raw !== '[DONE]') {
-      try { payload = JSON.parse(raw) } catch { /* Preserve opaque data. */ }
-    }
-    events.push({ event, data: payload, rawData: raw, ...(id ? { id } : {}), ...(retry != null ? { retry } : {}) })
-    event = 'message'
-    data = []
-    id = undefined
-    retry = undefined
-  }
-  for (const line of value.split(/\r\n|\r|\n/)) {
-    if (!line) {
-      dispatch()
-      continue
-    }
-    if (line.startsWith(':')) continue
-    const colon = line.indexOf(':')
-    const field = colon === -1 ? line : line.slice(0, colon)
-    const fieldValue = colon === -1 ? '' : line.slice(colon + 1).replace(/^ /, '')
-    if (field === 'event') event = fieldValue || 'message'
-    else if (field === 'data') data.push(fieldValue)
-    else if (field === 'id') id = fieldValue
-    else if (field === 'retry' && /^\d+$/.test(fieldValue)) retry = Number(fieldValue)
-  }
-  dispatch()
-  return events
+function humanTime(value?: number): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return value < 1000 ? `${value} µs` : `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)} ms`
 }
 
 function pretty(value: unknown): string {
   return JSON.stringify(value ?? null, null, 2)
 }
 
-function humanBytes(value?: number): string {
-  if (value == null || !Number.isFinite(value)) return '—'
-  if (value < 1024) return `${value} B`
-  if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KiB`
-  return `${(value / 1024 ** 2).toFixed(1)} MiB`
-}
-
-function humanTime(value?: number): string {
-  if (value == null || !Number.isFinite(value)) return '—'
-  return value < 1000 ? `${value} µs` : `${(value / 1000).toFixed(value < 10000 ? 1 : 0)} ms`
-}
-
-function recordValue(record: unknown, keys: string[]): unknown {
-  if (!record || typeof record !== 'object') return '—'
-  const candidate = record as Record<string, unknown>
-  for (const key of keys) if (candidate[key] != null) return candidate[key]
-  return '—'
-}
-
-function recordBytes(record: unknown): number | undefined {
-  const direct = Number(recordValue(record, ['size', 'bytes', 'length']))
-  if (Number.isFinite(direct)) return direct
-  if (!record || typeof record !== 'object') return undefined
-  const encoded = (record as Record<string, unknown>).bytesBase64
-  if (typeof encoded !== 'string') return undefined
-  const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0
-  return Math.max(0, encoded.length * 3 / 4 - padding)
-}
-
-async function load(): Promise<void> {
-  loading.value = true
+function parsedResponse(detail: CaptureDetail): unknown {
+  if (!detail.response || typeof detail.response !== 'object') return detail.response
+  const response = detail.response as Record<string, unknown>
+  if (typeof response.bodyUtf8 !== 'string') return response
   try {
-    captures.value = await getCaptures()
+    return { ...response, body: JSON.parse(response.bodyUtf8) }
+  } catch {
+    return response
+  }
+}
+
+async function refreshDeck(initial = false): Promise<void> {
+  if (refreshing) return
+  refreshing = true
+  if (initial) loading.value = true
+  try {
+    await runtime.refresh()
+    recordings.value = await getRecordings()
+    const preferred = runtime.state.mode === 'record'
+      ? runtime.state.activeRecordingId
+      : runtime.state.replayRecordingId
+    if (preferred) selectedRecordingId.value = preferred
+    else if (!recordings.value.some((recording) => recording.id === selectedRecordingId.value)) {
+      selectedRecordingId.value = recordings.value[0]?.id || ''
+    }
     error.value = ''
-    const requested = String(route.query.id || '')
-    if (requested && captures.value.some((item) => item.id === requested)) await selectCapture(requested)
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not list recordings'
+    error.value = cause instanceof Error ? cause.message : 'Could not refresh recordings'
   } finally {
     loading.value = false
+    refreshing = false
   }
 }
 
-async function selectCapture(id: string): Promise<void> {
-  detailLoading.value = true
-  activeTab.value = 'summary'
+async function toggleRecording(): Promise<void> {
+  if (runtime.state.mode !== 'record' && !recordingReady.value) return
+  switching.value = true
   try {
-    selected.value = await getCapture(id)
-    await router.replace({ query: { ...route.query, id } })
+    if (runtime.state.mode === 'record') await runtime.update({ mode: 'replay' })
+    else await runtime.update({ mode: 'record', recordingProtocol: recordingProtocol.value })
+    selectedCapture.value = null
+    await refreshDeck()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not read recording'
+    error.value = cause instanceof Error ? cause.message : 'Could not change recorder state'
+  } finally {
+    switching.value = false
+  }
+}
+
+async function replay(recording: RecordingSummary): Promise<void> {
+  if (!recording.completeCount) return
+  switching.value = true
+  try {
+    await runtime.update({ mode: 'replay', replayRecordingId: recording.id })
+    selectedRecordingId.value = recording.id
+    selectedCapture.value = null
+    await refreshDeck()
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Could not start replay'
+  } finally {
+    switching.value = false
+  }
+}
+
+async function selectCapture(capture: CaptureSummary): Promise<void> {
+  if (capture.partial) return
+  detailLoading.value = true
+  try {
+    selectedCapture.value = await getCapture(capture.id)
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Could not read request'
   } finally {
     detailLoading.value = false
-  }
-}
-
-async function remove(): Promise<void> {
-  if (!selected.value || !window.confirm(`Move ${selected.value.id} to trash?`)) return
-  try {
-    await deleteCapture(selected.value.id)
-    captures.value = captures.value.filter((item) => item.id !== selected.value?.id)
-    selected.value = null
-    await router.replace({ query: {} })
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not remove recording'
   }
 }
 
@@ -191,9 +155,10 @@ async function importFile(event: Event): Promise<void> {
   if (!file) return
   importing.value = true
   try {
-    const imported = await importCapture(file)
-    await load()
-    await selectCapture(imported.id)
+    const capture = await importCapture(file)
+    await refreshDeck()
+    selectedRecordingId.value = capture.recordingId || capture.id
+    await selectCapture(capture)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'Import failed'
   } finally {
@@ -203,303 +168,245 @@ async function importFile(event: Event): Promise<void> {
 }
 
 async function saveAsScenario(): Promise<void> {
-  if (!selected.value) return
-  converting.value = true
+  if (!selectedCapture.value) return
   try {
-    const scenario = await captureToScenario(selected.value.id)
-    await router.push({ name: 'scenarios', query: { id: scenario.id } })
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not convert recording'
-  } finally {
-    converting.value = false
-  }
-}
-
-function bindForReplay(): void {
-  if (!selected.value) return
-  void router.push({
-    name: 'replay',
-    query: {
-      sourceType: 'capture',
-      sourceId: selected.value.id,
-      protocol: selected.value.protocol,
-      stream: String(selected.value.stream),
-    },
-  })
-}
-
-async function startRecording(): Promise<void> {
-  if (!recordingReady.value) return
-  switchingMode.value = true
-  try {
-    await runtime.update({ mode: 'record', recordingProtocol: recordingProtocol.value })
+    await captureToScenario(selectedCapture.value.id)
     error.value = ''
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not start recording'
-  } finally {
-    switchingMode.value = false
+    error.value = cause instanceof Error ? cause.message : 'Could not create scenario'
   }
 }
 
-async function stopRecording(): Promise<void> {
-  switchingMode.value = true
+async function removeCapture(): Promise<void> {
+  const capture = selectedCapture.value
+  if (!capture || !window.confirm(`Move ${capture.id} to trash?`)) return
   try {
-    await runtime.setMode('replay')
-    error.value = ''
+    await deleteCapture(capture.id)
+    selectedCapture.value = null
+    await refreshDeck()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not switch to replay'
-  } finally {
-    switchingMode.value = false
+    error.value = cause instanceof Error ? cause.message : 'Could not remove request'
   }
+}
+
+async function poll(): Promise<void> {
+  await refreshDeck()
+  pollTimer = window.setTimeout(poll, runtime.state.mode === 'record' ? 700 : 2_000)
 }
 
 onMounted(async () => {
-  await runtime.refresh()
+  await refreshDeck(true)
   recordingProtocol.value = configuredUpstreams.value.some(
     (upstream) => upstream.protocol === runtime.state.recordingProtocol,
   ) ? runtime.state.recordingProtocol : configuredUpstreams.value[0]?.protocol || runtime.state.recordingProtocol
-  await load()
+  pollTimer = window.setTimeout(poll, 700)
 })
+
+onBeforeUnmount(() => window.clearTimeout(pollTimer))
 </script>
 
 <template>
-  <section class="page recordings-page">
+  <section class="page recorder-page">
     <header class="page-heading">
       <div>
-        <h1>Recordings</h1>
-        <p>Inspect immutable request and response captures. API keys are removed before files reach this list.</p>
+        <h1>Recorder</h1>
+        <p>Press record, send API requests, then replay the same responses in the same order.</p>
       </div>
       <div class="heading-actions">
         <input ref="fileInput" class="visually-hidden" type="file" accept=".jsonl,.json,application/json" @change="importFile" />
-        <var-button outline :loading="importing" @click="fileInput?.click()">Import capture</var-button>
-        <var-button :loading="loading" @click="load">Refresh</var-button>
+        <var-button text :loading="importing" @click="fileInput?.click()">Import</var-button>
       </div>
     </header>
 
     <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
 
-    <article class="panel recorder-panel" :class="{ 'is-recording': runtime.state.mode === 'record' }">
-      <div class="recorder-state">
-        <span class="eyebrow">Recording mode</span>
-        <h2>{{ runtime.state.mode === 'record' ? `Recording ${protocols[runtime.state.recordingProtocol].label}` : 'Choose an upstream to record' }}</h2>
-        <p v-if="runtime.state.mode === 'record'">Requests to the matching generation endpoint and <code>/v1/models</code> are passing through and being captured.</p>
-        <p v-else>Only the selected protocol is passed through. Other generation protocols remain unavailable until replay is active.</p>
+    <article class="panel recorder" :class="{ recording: runtime.state.mode === 'record' }">
+      <button
+        class="record-button"
+        :class="{ stop: runtime.state.mode === 'record' }"
+        type="button"
+        :disabled="switching || (runtime.state.mode !== 'record' && !recordingReady)"
+        :aria-label="runtime.state.mode === 'record' ? 'Stop recording' : 'Start recording'"
+        @click="toggleRecording"
+      >
+        <span aria-hidden="true">{{ runtime.state.mode === 'record' ? '■' : '●' }}</span>
+      </button>
+
+      <div class="recorder-copy">
+        <span class="eyebrow">{{ runtime.state.mode === 'record' ? 'Recording' : 'Ready' }}</span>
+        <h2>{{ runtime.state.mode === 'record' ? `${activeRecording?.requestCount || 0} requests captured` : 'New recording' }}</h2>
+        <p v-if="runtime.state.mode === 'record'" class="mono">{{ endpoint }}</p>
+        <p v-else>Each press starts a fresh ordered recording.</p>
       </div>
-      <div class="recorder-controls">
-        <label class="field">
-          <span>Upstream API</span>
-          <select v-model="recordingProtocol" :disabled="switchingMode || !configuredUpstreams.length">
-            <option v-for="upstream in configuredUpstreams" :key="upstream.protocol" :value="upstream.protocol">
-              {{ protocols[upstream.protocol].label }} · {{ upstream.baseUrl }}
-            </option>
-          </select>
-          <small v-if="selectedUpstream?.baseUrl && !runtime.state.enabledEndpoints.includes(recordingProtocol)" class="error-text">Enable this protocol in Settings before recording.</small>
-          <small v-else-if="!configuredUpstreams.length" class="error-text">Configure at least one upstream API in Settings.</small>
-          <small v-else class="field-help mono">{{ recordingEndpoint }}</small>
-        </label>
-        <div class="button-row recorder-actions">
-          <router-link v-if="!configuredUpstreams.length" class="action-link small" to="/settings">Configure upstreams</router-link>
-          <var-button
-            v-if="runtime.state.mode !== 'record' || runtime.state.recordingProtocol !== recordingProtocol"
-            color="danger"
-            :disabled="!recordingReady"
-            :loading="switchingMode"
-            @click="startRecording"
-          >Start recording</var-button>
-          <var-button v-else outline :loading="switchingMode" @click="stopRecording">Stop &amp; use replay</var-button>
-        </div>
-      </div>
+
+      <label class="field source-field">
+        <span>Upstream</span>
+        <select v-model="recordingProtocol" :disabled="runtime.state.mode === 'record' || switching || !configuredUpstreams.length">
+          <option v-for="upstream in configuredUpstreams" :key="upstream.protocol" :value="upstream.protocol">
+            {{ protocols[upstream.protocol].label }}
+          </option>
+        </select>
+        <small v-if="!configuredUpstreams.length" class="error-text">Add an upstream in Settings first.</small>
+        <small v-else-if="!recordingReady" class="error-text">Enable this API in Settings first.</small>
+        <small v-else class="field-help truncate">{{ selectedUpstream?.baseUrl }}</small>
+      </label>
     </article>
 
-    <article class="panel filters-panel">
-      <div class="panel-body toolbar">
-        <label class="field filter-search">
-          <span>Search</span>
-          <input v-model="filters.search" type="search" placeholder="ID, URL, or protocol" />
-        </label>
-        <label class="field">
-          <span>Protocol</span>
-          <select v-model="filters.protocol">
-            <option value="">All protocols</option>
-            <option value="openai-chat">OpenAI Chat</option>
-            <option value="openai-responses">OpenAI Responses</option>
-            <option value="anthropic-messages">Anthropic Messages</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Outcome</span>
-          <select v-model="filters.outcome">
-            <option value="">All outcomes</option>
-            <option value="complete">Complete</option>
-            <option value="upstream_error">Upstream error</option>
-            <option value="client_cancelled">Client cancelled</option>
-            <option value="timeout">Timeout</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Transport</span>
-          <select v-model="filters.stream">
-            <option value="">Stream + non-stream</option>
-            <option value="true">Streaming</option>
-            <option value="false">Non-streaming</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Integrity</span>
-          <select v-model="filters.partial">
-            <option value="">Exact + partial</option>
-            <option value="exact">Body exact</option>
-            <option value="inexact">Sanitized / inexact</option>
-            <option value="partial">Partial</option>
-          </select>
-        </label>
+    <article class="panel queue-panel">
+      <header class="panel-header queue-header">
+        <div>
+          <h2>{{ runtime.state.mode === 'record' ? 'Live requests' : 'Replay queue' }}</h2>
+          <span v-if="shownRecording" class="panel-note mono">{{ shownRecording.id }}</span>
+        </div>
+        <div v-if="shownRecording" class="queue-status">
+          <span v-if="runtime.state.mode === 'record'" class="badge danger">Live</span>
+          <template v-else>
+            <span v-if="replayingShownRecording" class="badge" :class="runtime.state.replayPosition >= runtime.state.replayTotal ? 'success' : 'warning'">
+              {{ runtime.state.replayPosition >= runtime.state.replayTotal ? 'Finished' : `${runtime.state.replayPosition}/${runtime.state.replayTotal}` }}
+            </span>
+            <var-button size="small" :loading="switching" :disabled="!shownRecording.completeCount" @click="replay(shownRecording)">
+              {{ replayingShownRecording && runtime.state.replayPosition > 0 ? 'Replay again' : 'Replay' }}
+            </var-button>
+          </template>
+        </div>
+      </header>
+
+      <div v-if="loading" class="loading-row"><var-loading size="small" /> Reading recordings</div>
+      <div v-else-if="!shownRecording" class="empty-state">
+        <div><strong>Nothing recorded yet</strong>Choose an upstream and press the red button.</div>
       </div>
-    </article>
-
-    <div class="recordings-grid">
-      <article class="panel recordings-list">
-        <header class="panel-header">
-          <h2>{{ filtered.length }} recording{{ filtered.length === 1 ? '' : 's' }}</h2>
-          <span class="panel-note">one file per request</span>
-        </header>
-        <div v-if="loading" class="loading-row"><var-loading size="small" /> Parsing capture index</div>
-        <div v-else-if="!filtered.length" class="empty-state">
-          <div><strong>No matching recordings</strong>Change the filters or import a capture file.</div>
-        </div>
-        <div v-else class="table-scroll">
-          <table class="data-table capture-table">
-            <thead><tr><th>Request</th><th>Protocol</th><th>Outcome</th><th>Latency</th><th>Size</th><th>Created</th></tr></thead>
-            <tbody>
-              <tr
-                v-for="capture in filtered"
-                :key="capture.id"
-                :class="{ 'is-selected': selected?.id === capture.id }"
-              >
-                <td>
-                  <button class="row-button" type="button" @click="selectCapture(capture.id)">
-                    <strong class="mono">{{ capture.id }}</strong>
-                    <span class="capture-url">{{ capture.downstreamUrl || capture.title || 'Captured request' }}</span>
-                  </button>
-                </td>
-                <td>{{ capture.protocol }}</td>
-                <td><span class="badge" :class="capture.outcome === 'complete' ? 'success' : 'danger'">{{ capture.outcome }}</span></td>
-                <td>{{ humanTime(capture.durationUs) }}</td>
-                <td>{{ humanBytes(capture.responseBytes) }}</td>
-                <td class="nowrap">{{ new Date(capture.createdAt).toLocaleString() }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      <article class="panel recording-detail">
-        <div v-if="detailLoading" class="loading-row"><var-loading size="small" /> Reading capture</div>
-        <div v-else-if="!selected" class="empty-state">
-          <div><strong>Select a recording</strong>Its request, response, timing, and raw records appear here.</div>
-        </div>
-        <template v-else>
-          <header class="panel-header detail-header">
-            <div class="detail-title">
-              <div class="button-row">
-                <span class="badge" :class="selected.outcome !== 'complete' || selected.bodyExact === false || selected.partial ? 'warning' : 'success'">
-                  {{ selected.partial ? 'Partial' : selected.outcome !== 'complete' ? 'Incomplete' : selected.bodyExact === false ? 'Sanitized / inexact' : 'Body exact' }}
+      <div v-else class="table-scroll">
+        <table class="data-table request-table">
+          <thead><tr><th>#</th><th>Request</th><th>Response</th><th>Time</th></tr></thead>
+          <tbody>
+            <tr
+              v-for="(capture, index) in shownRecording.requests"
+              :key="capture.id"
+              :class="{
+                'is-selected': selectedCapture?.id === capture.id,
+                consumed: replayingShownRecording && index < runtime.state.replayPosition,
+                next: replayingShownRecording && index === runtime.state.replayPosition,
+              }"
+            >
+              <td class="request-index">{{ index + 1 }}</td>
+              <td>
+                <button class="row-button" type="button" :disabled="capture.partial" @click="selectCapture(capture)">
+                  <strong>{{ capture.method || 'POST' }}</strong>
+                  <span class="mono request-path">{{ pathOf(capture) }}</span>
+                </button>
+              </td>
+              <td>
+                <span v-if="capture.partial" class="badge danger">Recording</span>
+                <span v-else class="badge" :class="capture.outcome === 'complete' ? 'success' : 'warning'">
+                  {{ capture.status || capture.outcome }}
                 </span>
-                <span class="badge" :class="selected.timingReplayable === false ? 'warning' : 'plain'">{{ selected.timingReplayable === false ? 'Timing degraded' : 'Recorded timing' }}</span>
-                <span class="badge info">{{ selected.protocol }}</span>
-              </div>
-              <h2 class="mono">{{ selected.id }}</h2>
-            </div>
-            <div class="button-row">
-              <var-button size="small" outline :loading="converting" :disabled="selected.partial" @click="saveAsScenario">Save as scenario</var-button>
-              <var-button size="small" outline :disabled="selected.partial" @click="bindForReplay">Bind to replay</var-button>
-              <var-button size="small" text color="danger" @click="remove">Move to trash</var-button>
-            </div>
-          </header>
-          <div class="detail-tabs">
-            <div class="tab-list" role="tablist" aria-label="Recording details">
-              <button v-for="tab in (['summary', 'request', 'response', 'parsed', 'timeline', 'raw'] as DetailTab[])" :key="tab" role="tab" :aria-selected="activeTab === tab" @click="activeTab = tab">
-                {{ tab[0].toUpperCase() + tab.slice(1) }}
-              </button>
-            </div>
-          </div>
+              </td>
+              <td class="nowrap">{{ humanTime(capture.durationUs) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
 
-          <div class="detail-content">
-            <template v-if="activeTab === 'summary'">
-              <dl class="detail-list summary-list">
-                <dt>Protocol</dt><dd>{{ selected.protocol }}</dd>
-                <dt>Method</dt><dd>{{ selected.method || 'POST' }}</dd>
-                <dt>Downstream URL</dt><dd class="mono">{{ selected.downstreamUrl || '—' }}</dd>
-                <dt>Upstream URL</dt><dd class="mono">{{ selected.upstreamUrl || '—' }}</dd>
-                <dt>Status</dt><dd>{{ selected.status || '—' }}</dd>
-                <dt>TTFB</dt><dd>{{ humanTime(selected.ttfbUs) }}</dd>
-                <dt>Total duration</dt><dd>{{ humanTime(selected.durationUs) }}</dd>
-                <dt>Timing replay</dt><dd>{{ selected.timingReplayable === false ? 'Degraded; instant only for raw replay' : 'Recorded offsets available' }}</dd>
-                <dt>Request bytes</dt><dd>{{ humanBytes(selected.requestBytes) }}</dd>
-                <dt>Response bytes</dt><dd>{{ humanBytes(selected.responseBytes) }}</dd>
-                <dt>Created</dt><dd>{{ new Date(selected.createdAt).toLocaleString() }}</dd>
-                <dt>Redactions</dt><dd>{{ selected.redactions?.join(', ') || 'No sensitive headers persisted' }}</dd>
-              </dl>
-              <div v-if="selected.hashes" class="hashes">
-                <span class="eyebrow">Integrity hashes</span>
-                <pre class="code-block">{{ pretty(selected.hashes) }}</pre>
-              </div>
-            </template>
-            <pre v-else-if="activeTab === 'request'" class="code-block">{{ pretty(selected.request) }}</pre>
-            <pre v-else-if="activeTab === 'response'" class="code-block">{{ pretty(selected.response) }}</pre>
-            <pre v-else-if="activeTab === 'parsed'" class="code-block">{{ pretty(parsedResponse) }}</pre>
-            <div v-else-if="activeTab === 'timeline'" class="timeline-table table-scroll">
-              <table v-if="timeline.length" class="data-table">
-                <thead><tr><th>#</th><th>Gateway time</th><th>Upstream read</th><th>Record</th><th>Event</th><th>Size</th></tr></thead>
-                <tbody>
-                  <tr v-for="(record, index) in timeline" :key="index">
-                    <td>{{ index }}</td>
-                    <td class="mono">{{ humanTime(Number(recordValue(record, ['atUs', 'offsetUs']))) }}</td>
-                    <td class="mono">{{ humanTime(Number(recordValue(record, ['upstreamObservedAtUs']))) }}</td>
-                    <td class="mono">{{ recordValue(record, ['type', 'kind']) }}</td>
-                    <td class="mono">{{ recordValue(record, ['event', 'eventName']) }}</td>
-                    <td>{{ humanBytes(recordBytes(record)) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-else class="empty-state"><div><strong>No derived timeline</strong>The raw capture is still available.</div></div>
-            </div>
-            <pre v-else class="code-block raw-block">{{ pretty(selected) }}</pre>
+    <article class="panel library-panel">
+      <header class="panel-header"><h2>Recordings</h2><span class="panel-note">{{ recordings.length }} saved</span></header>
+      <div v-if="!recordings.length" class="empty-state compact"><div>No saved recordings.</div></div>
+      <div v-else class="recording-list">
+        <button
+          v-for="recording in recordings"
+          :key="recording.id"
+          type="button"
+          class="recording-row"
+          :class="{ selected: shownRecording?.id === recording.id }"
+          @click="selectedRecordingId = recording.id; selectedCapture = null"
+        >
+          <span><strong>{{ new Date(recording.createdAt).toLocaleString() }}</strong><small class="mono">{{ recording.id }}</small></span>
+          <span>{{ protocols[recording.protocol].label }}</span>
+          <span>{{ recording.requestCount }} request{{ recording.requestCount === 1 ? '' : 's' }}</span>
+          <span v-if="recording.active" class="badge danger">Live</span>
+          <span v-else-if="runtime.state.replayRecordingId === recording.id" class="badge warning">Loaded</span>
+          <span v-else class="recording-open">Open</span>
+        </button>
+      </div>
+    </article>
+
+    <article v-if="detailLoading || selectedCapture" class="panel request-detail">
+      <div v-if="detailLoading" class="loading-row"><var-loading size="small" /> Reading request</div>
+      <template v-else-if="selectedCapture">
+        <header class="panel-header">
+          <div><h2>{{ selectedCapture.method }} {{ pathOf(selectedCapture) }}</h2><span class="panel-note mono">{{ selectedCapture.id }}</span></div>
+          <div class="button-row">
+            <var-button size="small" text @click="saveAsScenario">Save as scenario</var-button>
+            <var-button size="small" text color="danger" @click="removeCapture">Move to trash</var-button>
           </div>
-        </template>
-      </article>
-    </div>
+        </header>
+        <div class="detail-body">
+          <dl class="detail-list request-facts">
+            <dt>Status</dt><dd>{{ selectedCapture.status || selectedCapture.outcome }}</dd>
+            <dt>TTFB</dt><dd>{{ humanTime(selectedCapture.ttfbUs) }}</dd>
+            <dt>Total</dt><dd>{{ humanTime(selectedCapture.durationUs) }}</dd>
+            <dt>Upstream</dt><dd class="mono">{{ selectedCapture.upstreamUrl }}</dd>
+          </dl>
+          <div class="payload-grid">
+            <details open><summary>Request</summary><pre class="code-block">{{ pretty(selectedCapture.request) }}</pre></details>
+            <details open><summary>Response</summary><pre class="code-block">{{ pretty(parsedResponse(selectedCapture)) }}</pre></details>
+          </div>
+          <details><summary>Timing and raw capture</summary><pre class="code-block raw-block">{{ pretty(selectedCapture) }}</pre></details>
+        </div>
+      </template>
+    </article>
   </section>
 </template>
 
 <style scoped>
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.page-error { margin-bottom: 14px; }
-.recorder-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, .8fr); gap: 24px; align-items: center; margin-bottom: 16px; padding: 19px; border-left: 5px solid var(--warning); }
-.recorder-panel.is-recording { border-color: var(--danger); background: color-mix(in srgb, var(--danger-soft) 42%, var(--surface)); }
-.recorder-state h2 { margin: 5px 0 6px; font-size: 17px; }
-.recorder-state p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.recorder-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
-.recorder-actions { min-height: 38px; }
-.filters-panel { margin-bottom: 16px; box-shadow: none; }
-.filter-search { min-width: 240px; flex: 1; }
-.recordings-grid { display: grid; grid-template-columns: minmax(520px, 1.2fr) minmax(380px, .8fr); gap: 16px; align-items: start; }
-.recordings-list { min-width: 0; }
-.capture-table { min-width: 760px; }
-.capture-url { display: block; max-width: 260px; margin-top: 4px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.recording-detail { position: sticky; top: 102px; min-width: 0; max-height: calc(100vh - 150px); overflow: auto; }
-.detail-header { align-items: flex-start; }
-.detail-title { min-width: 0; }
-.detail-title h2 { margin: 9px 0 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; }
-.detail-tabs { padding: 12px 16px 0; }
-.detail-content { padding: 16px; }
-.summary-list { grid-template-columns: 116px minmax(0, 1fr); }
-.hashes { display: grid; gap: 8px; margin-top: 20px; }
-.raw-block { max-height: 58vh; }
-@media (max-width: 1400px) {
-  .recordings-grid { grid-template-columns: 1fr; }
-  .recording-detail { position: static; max-height: none; }
-}
+.page-error { margin-bottom: 16px; }
+.recorder-page { width: min(1120px, 100%); }
+.recorder { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(260px, 340px); gap: 24px; align-items: center; padding: 24px; }
+.recorder.recording { border-color: color-mix(in srgb, var(--danger) 52%, var(--border)); background: color-mix(in srgb, var(--danger-soft) 30%, var(--surface)); }
+.record-button { display: grid; width: 78px; height: 78px; place-items: center; border: 4px solid var(--danger); border-radius: 50%; background: var(--surface); color: var(--danger); box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 13%, transparent); font-size: 31px; line-height: 1; }
+.record-button:hover { transform: scale(1.03); }
+.record-button.stop { background: var(--danger); color: #fff; }
+.record-button.stop span { font-size: 21px; }
+.record-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.recorder-copy h2 { margin: 5px 0 6px; font-size: 20px; letter-spacing: -.02em; }
+.recorder-copy p { margin: 0; color: var(--muted); font-size: 11px; }
+.source-field { align-self: stretch; justify-content: center; }
+.queue-panel, .library-panel, .request-detail { margin-top: 18px; overflow: hidden; }
+.queue-header > div:first-child { min-width: 0; }
+.queue-header .panel-note { display: block; max-width: 520px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; }
+.queue-status { display: flex; align-items: center; gap: 10px; }
+.request-table { min-width: 620px; }
+.request-table tr.consumed { opacity: .55; }
+.request-table tr.next { background: var(--warning-soft); }
+.request-index { width: 54px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.request-path { display: block; max-width: 640px; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.recording-list { display: grid; }
+.recording-row { display: grid; width: 100%; min-height: 66px; grid-template-columns: minmax(260px, 1.5fr) minmax(140px, .8fr) 110px 76px; align-items: center; gap: 18px; padding: 10px 18px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: inherit; text-align: left; }
+.recording-row:last-child { border-bottom: 0; }
+.recording-row:hover, .recording-row.selected { background: var(--surface-soft); }
+.recording-row > span:first-child { min-width: 0; }
+.recording-row strong, .recording-row small { display: block; }
+.recording-row small { margin-top: 5px; overflow: hidden; color: var(--muted); text-overflow: ellipsis; }
+.recording-open { color: var(--accent-strong); font-weight: 700; }
+.empty-state.compact { min-height: 90px; }
+.detail-body { display: grid; gap: 18px; padding: 18px; }
+.request-facts { grid-template-columns: 70px minmax(0, 1fr); }
+.payload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+details { min-width: 0; }
+summary { margin-bottom: 9px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 700; }
+.raw-block { max-height: 460px; }
 @media (max-width: 900px) {
-  .recorder-panel, .recorder-controls { grid-template-columns: 1fr; }
+  .recorder { grid-template-columns: auto 1fr; }
+  .source-field { grid-column: 1 / -1; }
+  .payload-grid { grid-template-columns: 1fr; }
+  .recording-row { grid-template-columns: 1fr auto; }
+  .recording-row > span:nth-child(2), .recording-row > span:nth-child(3) { display: none; }
+}
+@media (max-width: 560px) {
+  .recorder { grid-template-columns: 1fr; text-align: center; }
+  .record-button { margin: 0 auto; }
+  .source-field { text-align: left; }
+  .queue-header { align-items: flex-start; flex-direction: column; }
 }
 </style>

@@ -6,6 +6,11 @@ import type { RuntimeMode, RuntimeState } from '../types'
 const fallbackRuntime: RuntimeState = {
   mode: 'replay',
   recordingProtocol: 'openai-chat',
+  activeRecordingId: '',
+  replayRecordingId: '',
+  replaySpeed: 1,
+  replayPosition: 0,
+  replayTotal: 0,
   revision: 0,
   activeRequests: 0,
   apiBaseUrl: 'http://127.0.0.1:3000',

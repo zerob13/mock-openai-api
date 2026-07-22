@@ -11,12 +11,10 @@ const dark = ref(localStorage.getItem('mock-console-theme') === 'dark' || (
 let refreshTimer: number | undefined
 
 const navigation = [
-  { to: '/', label: 'Dashboard', short: 'Home', icon: '⌂' },
-  { to: '/recordings', label: 'Recordings', short: 'Files', icon: '◉' },
-  { to: '/replay', label: 'Replay', short: 'Replay', icon: '▶' },
+  { to: '/recordings', label: 'Recorder', short: 'Record', icon: '●' },
   { to: '/scenarios', label: 'Scenario Editor', short: 'Editor', icon: '✦' },
-  { to: '/settings', label: 'Settings', short: 'Settings', icon: '⚙' },
   { to: '/test', label: 'API Test', short: 'Test', icon: '↗' },
+  { to: '/settings', label: 'Settings', short: 'Settings', icon: '⚙' },
 ]
 
 const protocolLabels = {
@@ -26,8 +24,9 @@ const protocolLabels = {
 }
 const modeLabel = computed(() => runtime.state.mode === 'record'
   ? `Recording · ${protocolLabels[runtime.state.recordingProtocol]}`
-  : 'Replay')
-const modePage = computed(() => runtime.state.mode === 'record' ? '/recordings' : '/replay')
+  : runtime.state.replayRecordingId
+    ? `Replay · ${runtime.state.replayPosition}/${runtime.state.replayTotal}`
+    : 'Replay ready')
 
 function applyTheme(): void {
   document.documentElement.dataset.theme = dark.value ? 'dark' : 'light'
@@ -51,7 +50,7 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
 <template>
   <div class="app-shell">
     <header class="app-header">
-      <router-link class="brand" to="/" aria-label="Mock OpenAI API dashboard">
+      <router-link class="brand" to="/recordings" aria-label="Mock OpenAI API recorder">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>
           <strong>Mock OpenAI API</strong>
@@ -60,7 +59,7 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
       </router-link>
 
       <div class="header-actions">
-        <router-link class="mode-status" :class="`is-${runtime.state.mode}`" :to="modePage">
+        <router-link class="mode-status" :class="`is-${runtime.state.mode}`" to="/recordings">
           <i aria-hidden="true"></i>{{ modeLabel }}
         </router-link>
         <span class="connection" :class="runtime.connected ? 'is-ready' : 'is-error'">
@@ -86,11 +85,6 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
           <span class="nav-short">{{ item.short }}</span>
         </router-link>
       </nav>
-      <div class="sidebar-mode">
-        <span class="eyebrow">Gateway state</span>
-        <strong><i :class="`mode-dot mode-${runtime.state.mode}`"></i>{{ modeLabel }}</strong>
-        <small>{{ runtime.state.activeRequests }} active request{{ runtime.state.activeRequests === 1 ? '' : 's' }}</small>
-      </div>
     </aside>
 
     <main class="app-main">
@@ -102,11 +96,5 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
       <router-view />
     </main>
 
-    <footer class="app-footer">
-      <span>Data <code>{{ runtime.state.dataDir }}</code></span>
-      <span>captures {{ runtime.state.captureCount }}</span>
-      <span>partial {{ runtime.state.partialCount }}</span>
-      <span>revision {{ runtime.state.revision }}</span>
-    </footer>
   </div>
 </template>

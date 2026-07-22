@@ -243,6 +243,8 @@ export function captureView(detail: CaptureDetail): Record<string, unknown> {
     filename: detail.filename,
     partial: detail.partial,
     protocol: detail.header.protocol,
+    recordingId: detail.header.recordingId,
+    recordingOrder: detail.header.recordingOrder,
     createdAt: detail.header.createdAt,
     outcome: detail.captureEnd?.outcome ?? 'capture_truncated',
     stream: requestMetadata?.stream ?? captureIsStream(detail),

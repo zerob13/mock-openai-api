@@ -54,6 +54,8 @@ export interface CaptureHeaderRecord {
   source: 'record';
   downstreamUrl: string;
   upstreamUrl: string;
+  recordingId?: string;
+  recordingOrder?: number;
   redactions: string[];
 }
 
@@ -168,6 +170,7 @@ export interface CaptureWriterOptions {
   startTimeNs?: bigint;
   clock?: () => bigint;
   credentialSecrets?: readonly (string | Uint8Array)[];
+  recording?: { id: string; order: number };
 }
 
 export interface FinishCaptureOptions {
@@ -203,6 +206,8 @@ export interface CaptureSummary {
   filename: string;
   partial: boolean;
   protocol?: CaptureProtocol;
+  recordingId?: string;
+  recordingOrder?: number;
   createdAt?: string;
   outcome?: CaptureOutcome;
   durationUs?: number;
@@ -257,6 +262,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const CAPTURE_ID_PATTERN = /^cap_[A-Za-z0-9_-]{8,128}$/;
+const RECORDING_ID_PATTERN = /^rec_[A-Za-z0-9_-]{8,128}$/;
 const CAPTURE_FILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,240}\.llmcap\.jsonl(?:\.partial)?$/;
 const PROTOCOLS = new Set<CaptureProtocol>([
   'openai-chat',
@@ -423,6 +429,11 @@ export function sanitizeErrorMessage(message: string): string {
 
 function assertCaptureId(id: string): void {
   if (!CAPTURE_ID_PATTERN.test(id)) throw new Error('Invalid capture id');
+}
+
+function assertRecording(id: string, order: number): void {
+  if (!RECORDING_ID_PATTERN.test(id)) throw new Error('Invalid recording id');
+  if (!Number.isSafeInteger(order) || order < 0) throw new Error('Invalid recording order');
 }
 
 function assertProtocol(protocol: string): asserts protocol is CaptureProtocol {
@@ -711,6 +722,7 @@ export class CaptureWriter {
     const id = options.id ?? `cap_${randomUUID().replace(/-/g, '')}`;
     assertCaptureId(id);
     assertProtocol(options.protocol);
+    if (options.recording) assertRecording(options.recording.id, options.recording.order);
     const downstreamUrl = sanitizeUrl(options.downstreamUrl);
     const upstreamUrl = sanitizeUrl(options.upstreamUrl);
     const requestUrl = options.request.url ? sanitizeUrl(options.request.url) : undefined;
@@ -761,6 +773,10 @@ export class CaptureWriter {
       source: 'record',
       downstreamUrl,
       upstreamUrl,
+      ...(options.recording ? {
+        recordingId: options.recording.id,
+        recordingOrder: options.recording.order,
+      } : {}),
       redactions: [
         'request.headers',
         'upstream.request.headers',
@@ -1270,6 +1286,12 @@ function validateCaptureHeader(record: CaptureRecord | undefined): CaptureHeader
   if (typeof record.downstreamUrl !== 'string' || typeof record.upstreamUrl !== 'string') {
     throw new Error('Capture URLs are invalid');
   }
+  if (record.recordingId !== undefined || record.recordingOrder !== undefined) {
+    if (typeof record.recordingId !== 'string' || typeof record.recordingOrder !== 'number') {
+      throw new Error('Capture recording metadata is incomplete');
+    }
+    assertRecording(record.recordingId, record.recordingOrder);
+  }
   return record;
 }
 
@@ -1501,6 +1523,8 @@ async function scanCaptureSummary(
     filename,
     partial,
     protocol: header.protocol,
+    recordingId: header.recordingId,
+    recordingOrder: header.recordingOrder,
     createdAt: header.createdAt,
     outcome: captureEnd?.outcome,
     durationUs: captureEnd?.atUs ?? responseEnd?.atUs,
@@ -1609,6 +1633,15 @@ export class CaptureStore {
   async read(identifier: string): Promise<CaptureDetail> {
     const resolved = await this.resolve(identifier);
     return parseCaptureFile(resolved.path, resolved.filename, resolved.partial);
+  }
+
+  async listRecording(recordingId: string, options: { includePartial?: boolean } = {}): Promise<CaptureSummary[]> {
+    const captures = await this.list(options);
+    return captures
+      .filter((capture) => capture.recordingId === recordingId
+        || (capture.recordingId === undefined && capture.id === recordingId))
+      .sort((left, right) => (left.recordingOrder ?? 0) - (right.recordingOrder ?? 0)
+        || String(left.createdAt).localeCompare(String(right.createdAt)));
   }
 
   async delete(identifier: string): Promise<void> {

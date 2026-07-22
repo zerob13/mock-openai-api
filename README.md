@@ -21,7 +21,9 @@ The server now starts two listeners:
 - Mock API: `http://127.0.0.1:3000`
 - Admin console: `http://127.0.0.1:3001`
 
-Replay and Recording are the two runtime states. Built-in examples are ordinary replay scenarios. Start Recording from the Recordings page by choosing one configured OpenAI Chat, OpenAI Responses, or Anthropic Messages upstream; start Replay from the Replay page. Recording forwards the original request and key only to the selected same-protocol upstream while storing one credential-redacted `.llmcap.jsonl` file per request. `GET /v1/models` follows the selected recording upstream. Response bytes, SSE read chunks, headers, status, and relative timestamps are retained for body-exact same-protocol replay. Captures can also be decoded into protocol-neutral scenarios and replayed through any supported generation protocol.
+The Recorder is the primary workflow. Press Record to start a new ordered recording, send any number of requests, then press Stop. Each request remains an independent credential-redacted `.llmcap.jsonl` file, tagged with the recording ID and its position; completed and in-flight requests appear as live rows in the console. Recording can use any configured OpenAI Chat, OpenAI Responses, or Anthropic Messages upstream, and `GET /v1/models` follows the selected upstream.
+
+Stopping automatically loads that recording for replay. Each supported incoming API call atomically consumes the next recorded response without matching its method, path, body, model, or prompt. The sixth request to a five-request recording returns `recording_exhausted`; pressing Replay rewinds the cursor. Same-protocol responses retain their original bytes, chunks, headers, status, and relative timing. A generation response requested through another supported protocol is transcoded through the scenario compiler. Built-in examples and manually edited scenarios remain available as the fallback when no recording is loaded.
 
 ```bash
 npm install

@@ -3,6 +3,7 @@ import type {
   CaptureSummary,
   PreviewResult,
   Protocol,
+  RecordingSummary,
   ReplayBinding,
   RuntimeState,
   Scenario,
@@ -57,6 +58,10 @@ export async function patchRuntime(patch: Partial<RuntimeState> & { revision: nu
 
 export async function getCaptures(): Promise<CaptureSummary[]> {
   return listFrom(await request<CaptureSummary[] | { items?: CaptureSummary[] }>('/captures'))
+}
+
+export async function getRecordings(): Promise<RecordingSummary[]> {
+  return listFrom(await request<RecordingSummary[] | { items?: RecordingSummary[] }>('/recordings'))
 }
 
 export function getCapture(id: string): Promise<CaptureDetail> {

@@ -6,12 +6,12 @@
 
 ## 0. 当前实现快照
 
-当前分支已经落地三协议 raw record/replay、跨协议 scenario 编译、Vue 3 + Varlet 管理后台、原子运行时配置和 JSONL capture 管理。实际控制面如下：
+当前分支已经落地三协议 raw record/replay、按录制场景顺序回放、跨协议 scenario 编译、Vue 3 + Varlet 管理后台、原子运行时配置和 JSONL capture 管理。实际控制面如下：
 
 ```text
-┌ Dashboard ─ Recordings ─ Replay ─ Scenario Editor ─ API Test ─ Settings ┐
-│ state: Recording / Replay            API :3000     Admin :3001          │
-└──────────────────────────────────────────────────────────────────────────┘
+┌ Recorder ─ Scenario Editor ─ API Test ─ Settings ┐
+│ [● Record / ■ Stop]  requests 3     Replay 2/5  │
+└───────────────────────────────────────────────────┘
 ```
 
 实现中的强制约束：
@@ -19,7 +19,8 @@
 - Record 模式只有一条 Node.js raw HTTP transport，不提供会解析或归一化事件的替代路径。
 - 非 loopback Admin listener 必须配置 bearer token，否则进程拒绝启动。
 - public upstream 默认执行 DNS 解析、private/special-use 地址拒绝和连接地址 pinning；本地 upstream 必须显式打开 `allowPrivateNetwork`。
-- 同协议 raw replay 只有在协议、`stream`、`include_usage`、完整性和 timing 条件同时满足时启用；否则走语义转换或拒绝不兼容绑定。
+- 选中的 recording 由一组带 `recordingId` / `recordingOrder` 的独立 capture 构成；Replay 使用进程内原子 cursor 顺序消费，不检查新请求的 method、path、body、model 或 prompt。
+- 同协议 capture 直接 raw replay；跨 generation 协议时才解析 capture 并编译为目标协议。旧 binding 和 built-in scenario 只在没有加载 recording 时作为兼容 fallback。
 - 当前是 single-process / single-writer 文件存储；不支持多个进程共享同一 data directory。
 
 ## 1. 先明确边界
@@ -55,12 +56,12 @@
    - `GET /v1/models`
 2. Record 模式下选择一个已配置的 OpenAI Chat、OpenAI Responses 或 Anthropic-compatible upstream；生成请求只从同协议入口原样透传，models 请求跟随该上游。
 3. 默认透传客户端原来的鉴权头；客户端只需要把 `baseURL` 改为本服务地址。
-4. 每个请求写入一个独立、可恢复、可校验的录制文件。
+4. 每个请求写入一个独立、可恢复、可校验的录制文件，并用 `recordingId` / `recordingOrder` 归入同一次录制。
 5. 完整记录 request/response body bytes、状态、headers、错误、取消和每个 chunk 的单调时钟时间点。
-6. Replay 模式下按录制延迟同协议重放；支持即时和倍率播放。
+6. Replay 模式下按一次录制的请求顺序逐个重放；每个新请求原子消费下一条响应，保留录制延迟并支持倍率播放。
 7. 把可支持的文本、Markdown、tool call、usage 和结束原因转换为另外两种协议。
 8. 默认以已有 mock 数据生成内置 scenario；服务启动后即可使用。
-9. 同进程启动 API listener 和管理后台 listener；Recordings 页面选择录制上游并启动录制，Replay 页面启动重放；后台同时管理 capture、binding、upstream 和可视化 scenario。
+9. 同进程启动 API listener 和管理后台 listener；Recorder 页面在一个录音机式界面中完成录制、实时逐行展示、停止、选择录制和顺序回放。
 
 ### 2.2 非目标
 
@@ -279,10 +280,10 @@ Client SDK ── HTTP ──> API listener ─┤ Runtime snapshot         │
           recording state                                      replay state
                │                                                     │
                v                                                     v
-      Selected raw proxy + tee                         Active capture/scenario binding
+      Selected raw proxy + tee                       Selected recording + atomic cursor
          │              │                                │                   │
          │              v                                v                   v
-         │       Capture JSONL                      Raw scheduler       IR compiler
+         │       Ordered capture JSONL              Raw scheduler       IR compiler
          v                                                 │                   │
       Upstream                                             └─ target encoder ──┘
                └──────────────────────────┬──────────────────────────┘
@@ -295,8 +296,8 @@ Browser ── HTTP ──> Admin listener ──> Control API / static Vue app 
 
 运行状态定义：
 
-- `record`：选择一个 `recordingProtocol`。匹配的生成入口透明代理到该协议 upstream 并写 capture；其他生成入口返回明确冲突，禁止暗中转码；`/v1/models` 跟随该 upstream 透传并写 capture。
-- `replay`：默认状态。根据 `(protocol, endpoint, stream)` 的 active binding 重放 capture 或 scenario；三个内置样例只是默认 replay source，不再构成独立运行模式。
+- `record`：选择一个 `recordingProtocol` 并创建新的 `activeRecordingId`。匹配的生成入口透明代理到该协议 upstream；`/v1/models` 跟随同一 upstream。每个请求独立落盘，并领取单调递增的 `recordingOrder`。
+- `replay`：默认状态。加载一个 `replayRecordingId`，每个新请求原子领取 cursor 指向的下一条 capture；请求内容不参与选择。三个内置样例和旧 binding 仅在没有加载 recording 时作为 fallback。
 
 每个请求在收到 headers 时获取一次不可变 runtime snapshot。后台切换模式只影响后续请求，不改变 in-flight request。
 
@@ -318,6 +319,9 @@ interface UpstreamConfig {
 interface RuntimeConfig {
   mode: 'record' | 'replay'
   recordingProtocol: Protocol
+  activeRecordingId: string
+  replayRecordingId: string
+  replaySpeed: 'instant' | number
 }
 ```
 
@@ -423,7 +427,7 @@ total_gateway_us
 
 `socket`、`lookup`、`connect` 和 `secureConnect` 事件存在时写入 `upstream.network` records；连接复用时记录 `reusedSocket: true`，不伪造不存在的 DNS/TCP/TLS 分段时间。
 
-Replay scheduler 以收到新 request headers 为时间原点，并发 drain incoming body。Response head/chunks 使用相对 `request_headers_at` 的 absolute offsets；选择 binding 或解析 body 完成时若目标时间已经过去，立即写出并记录 lateness。对于 upstream 在 request body 结束前就拒绝请求的 capture，首版无法在依赖 body 中 `stream` 字段选择 binding 的同时复现负 upload overlap，必须标记 `timingReplayable: false`，UI 显示 timing degraded，而不能伪造一个正 delay。
+Replay scheduler 以收到新 request headers 为时间原点，并发 drain incoming body。主顺序回放路径在 headers 到达时就原子领取下一条 capture，不依赖 body 中的任何字段；response head/chunks 使用相对 `request_headers_at` 的 absolute offsets。调度已晚于目标时间时立即写出并记录 lateness。旧 binding/scenario fallback 仍可能需要解析 body 决定输出形态，因此无法复现的 upload overlap 必须标记为 timing degraded。
 
 `response.body_chunk.atUs` 表示调用 downstream `write()` 的时间，另存 `upstreamObservedAtUs` 表示从 upstream readable 观察到该 chunk 的时间。Replay 使用 downstream write schedule；两者不能在背压场景中混为同一延迟。
 
@@ -656,39 +660,23 @@ Markdown 在线路协议里仍是普通文本；编辑器用 `format: "markdown"
 
 ### 9.1 选择规则
 
-用户要求“发送任意信息获得重放结果”，因此默认不做 prompt 匹配。后台维护 active binding：
+一次 Record 按钮周期就是一个 recording。它不增加 manifest 文件，而是从 capture header 的 `recordingId` / `recordingOrder` 动态聚合；旧文件缺少这两个字段时，兼容为只有一个请求的 recording。
 
-```ts
-interface ReplayBinding {
-  protocol: Protocol
-  endpoint: string
-  stream: boolean
-  source: { kind: 'capture' | 'scenario'; id: string }
-  mode: 'body-exact' | 'transcoded'
-  speed: 'instant' | number
-}
-```
+进入 Replay 后，runtime 保存选中的 `replayRecordingId` 和进程内 cursor。任何受支持的 API 请求到达时都会原子领取下一条 capture，选择过程不读取、不比较 method、path、body、model、prompt、`stream` 或 `stream_options`。入口只决定跨 generation 协议时的目标 encoder，不决定取哪条录制。五条 capture 就消费五次请求；第六次返回 `409 recording_exhausted`。后台 Replay 操作会把 cursor 归零。
 
-键为 `(protocol, endpoint, stream)`。请求 body 中的 `stream` 和 `stream_options` 不影响 active source 选择，但会影响 replay eligibility/output：Scenario compiler 必须处理 Chat 的 `include_usage/include_obfuscation` 与 Responses 的 `include_obfuscation`；Body Exact capture 则比较录制请求与当前请求的 effective stream-control fingerprint，不一致时返回 `409 replay_options_mismatch`，绝不改写录制 bytes 后继续显示 Body Exact。其他内容默认不影响 active source 选择。后续可以增加显式策略，但不进入首版核心：
+该 cursor 是 single-process 范围的共享状态：并发客户端也共享同一序列，但原子领取保证同一条不会被重复消费。首版不为每个 client 建立 session，也不增加数据库或分布式锁。
 
-- exact request fingerprint；
-- model + explicit tag；
-- deterministic playlist。
-
-不增加 embedding、相似度或随机 matcher。
+没有加载 recording 时，旧 active binding 和 built-in scenarios 继续作为兼容 fallback；它们不参与主 record-and-replay 选择。
 
 ### 9.2 Raw Replay
 
-只有以下条件全部满足才显示 `Body Exact`：
+顺序回放中，以下条件全部满足时使用 raw replay：
 
-1. source 是 `outcome: "complete"` 的完整 capture；
-2. source protocol 与 target protocol 一致；
-3. request 的 stream 形态与 capture 一致；
-4. effective `stream_options` fingerprint 与 capture 一致；
-5. response body 未被编辑或转换；
-6. capture 没有 `capture_truncated` / `recording_error`；
-7. `downstreamBytesWritten` 与 `response.end.bytes` 一致，且没有提前 client disconnect；
-8. status、end-to-end header values、trailers 和 recorded termination semantics 都能在当前 HTTP runtime 重现。
+1. capture 有可重放的 downstream response；完整的 gateway/upstream error response 也可重放；
+2. source protocol 与 target protocol 一致，或该 capture 是 `/v1/models` 等 raw-only 请求；
+3. response body 未被编辑或转换；
+4. capture 没有无法读取的截断或录制写入错误；
+5. status、end-to-end header values、trailers 和 recorded termination semantics 能在当前 HTTP runtime 重现。
 
 流程：
 
@@ -734,10 +722,11 @@ X-Mock-Replay-Source: cap_...
 
 ### 9.4 Stream 与 non-stream
 
-- Raw capture 不能在 stream/non-stream 之间伪装；没有对应 active binding 时返回 `409 replay_binding_mismatch`。
-- Scenario 可以从同一 timeline 编译为 stream 或 non-stream。
+- 主 recording replay 不解析新请求；输出使用下一条 capture 已录制的 stream/non-stream 形态。
+- 同协议直接写出原 response body chunks；跨 generation 协议由 capture 的已录制响应解析为 scenario，再编译为请求入口对应协议。
+- `/v1/models` 等非 generation capture 只做 raw replay，不尝试语义转换。
 - Record mode 不解析后重写 `stream`，而是原样代理。
-- Replay/Builtin mode 做宽松 JSON parse 读取 `stream` 与上述 `stream_options`；无效 JSON 返回协议对应的 `400`。未知字段不参与 binding，但 parser/diagnostics 不得把它们误报为已经模拟。
+- 只有旧 binding/built-in fallback 才宽松解析 body 来编译 scenario；无效 JSON 在该兼容路径返回协议对应的 `400`。
 
 ## 10. 跨协议语义映射
 
@@ -828,7 +817,7 @@ Function arguments 在 IR 中始终是 opaque string fragments。编译到 Anthr
 - 删除先原子移动到 `trash/`；首版不提供永久清理和 restore API。
 - import 使用带 64 MiB 硬上限的 raw `application/octet-stream`/JSON body，不引入 multipart parser；内存校验、写入唯一 `.partial`、复核 schema/hash 后再用同目录 hard-link 原子发布 final file，并清理临时链接。
 - `.partial` 默认不参与 active replay，但可在后台查看或移入 trash。
-- `runtime.json` 只保存 mode、`recordingProtocol`、active bindings、非敏感 upstream 配置和 revision；所有写入使用 temp + atomic rename。
+- `runtime.json` 保存 mode、`recordingProtocol`、`activeRecordingId`、`replayRecordingId`、`replaySpeed`、兼容 bindings、非敏感 upstream 配置和 revision；cursor 只存在进程内，Replay 或重新选择 recording 时归零。所有写入使用 temp + atomic rename。
 
 ## 12. Admin Control API
 
@@ -845,7 +834,7 @@ GET   /runtime
 PATCH /runtime
 ```
 
-`GET /runtime` 返回 mode、`recordingProtocol`、revision、enabled endpoints、active requests、data dir 状态和不含 secret 的 upstream summary。`PATCH` 必须携带当前 revision，避免多个 tab 静默覆盖。进入 Record 状态时只要求选中的 upstream 已配置且同协议 endpoint 已启用，不再要求所有 endpoint 都配置 upstream。Dashboard 以低频 polling 更新，首版不再增加一套 admin activity SSE。
+`GET /runtime` 返回 mode、`recordingProtocol`、active/replay recording ID、replay position/total、speed、revision、enabled endpoints、active requests、data dir 状态和不含 secret 的 upstream summary。`PATCH` 必须携带当前 revision，避免多个 tab 静默覆盖。进入 Record 状态时只要求选中的 upstream 已配置且同协议 endpoint 已启用；切回 Replay 时默认加载刚结束的 recording 并将 cursor 归零。
 
 ### 12.2 Upstream checks
 
@@ -866,6 +855,14 @@ DELETE /captures/:id          # move to trash
 ```
 
 List 使用轻量顺序扫描，不 materialize response body。Detail 返回 request/response/body/timeline/records，单次 materialization 上限为 64 MiB；首版没有 records cursor、download 和 restore。
+
+录制聚合接口：
+
+```text
+GET /recordings
+```
+
+它按 capture header 动态返回 recording、协议、请求数量、完成数量和按 `recordingOrder` 排序的请求 summary，不新增 manifest 或数据库。
 
 ### 12.4 Scenarios
 
@@ -914,9 +911,9 @@ Varlet UI
 
 Pinia 首版只保留一个跨页面 store：
 
-- `runtimeStore`：mode、revision、active request、binding summary；
+- `runtimeStore`：mode、revision、recording IDs、replay cursor、active request；
 
-录制列表、筛选、详情和 scenario draft 留在各 view 的 local state；不建立通用 CRUD/editor store。Editor 使用 route-leave guard 阻止未保存离开。Runtime 状态被全局状态标识、Dashboard、Recordings、Replay 和 Settings 同时消费，因此保留一个 Pinia store 有实际收益。
+录制列表、详情和 scenario draft 留在各 view 的 local state；不建立通用 CRUD/editor store。Editor 使用 route-leave guard 阻止未保存离开。Runtime 状态被全局状态标识、Recorder 和 Settings 同时消费，因此保留一个 Pinia store 有实际收益。
 
 Varlet 按[官方 Quickstart](https://varletjs.org/#/zh-CN/quickstart)接入，并只注册当前使用的组件：
 
@@ -938,71 +935,36 @@ Varlet 偏 mobile-first，首版桌面布局使用固定 CSS grid，不增加 re
 ### 13.2 信息架构
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│ Mock OpenAI API   ● Recording · Anthropic Messages   API ● :3000       │
-├───────────────────┬──────────────────────────────────────────────────────┤
-│ Dashboard         │ Runtime                                              │
-│ Recordings        │ ┌────────────┬────────────┬────────────┐             │
-│ Replay            │ │ Requests 3 │ Captures 8 │ Errors 0   │             │
-│ Scenario Editor   │ └────────────┴────────────┴────────────┘             │
-│ Settings          │                                                      │
-│                   │ Endpoint                    Binding          Status   │
-│                   │ /v1/chat/completions        Built-in text    Ready    │
-│                   │ /v1/responses               Tool scenario    Ready    │
-│                   │ /v1/messages                Anthropic demo   Ready    │
-│                   │                                                      │
-│                   │ Recent activity                                      │
-├───────────────────┴──────────────────────────────────────────────────────┤
-│ Data /.../recordings   body-exact 2   transcoded 1   partial 0           │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ Mock OpenAI API          ● Recording · OpenAI Chat      │
+├──────────────┬───────────────────────────────────────────┤
+│ Recorder     │ Upstream [OpenAI Chat ▾]                 │
+│ Editor       │                                           │
+│ API Test     │       [ ●  RECORD ] / [ ■  STOP ]        │
+│ Settings     │                                           │
+│              │ 1  POST /v1/chat/completions  200  318ms │
+│              │ 2  GET  /v1/models           200   42ms │
+│              │                                           │
+│              │ Recording 2026-07-22 · 2 requests        │
+│              │                   [Replay 0/2]            │
+└──────────────┴───────────────────────────────────────────┘
 ```
 
-顶部只显示醒目的当前状态，不提供全局下拉切换。Recordings 页面显示 upstream selector、实际 generation endpoint 与主操作按钮，在这里原子提交 `recordingProtocol + mode=record`；Replay 页面提供 `mode=replay` 的主操作。Recording 只开放选中协议的生成入口，不把请求误送到其他 provider。
+顶部只显示醒目的当前状态，不提供全局 mode 下拉。Recorder 是唯一的录制/回放控制面；Dashboard 与独立 Replay 页面从主导航移除。桌面使用窄侧栏，移动端使用四项底部导航。
 
-### 13.3 Recordings 页面
+### 13.3 Recorder 页面
 
-页面首部提供录制控制：从已配置 upstream 中选择一个协议并一键开始；当前正在录制时使用红色状态面板展示 provider、generation endpoint 与 `/v1/models` 透传提示，也可在原位置停止并回到 Replay。
+页面首部像录音机：从已配置 upstream 中选择一个协议，使用一个高辨识度的 Record/Stop 主按钮。每次开始都生成新 recording；Stop 自动切到 Replay 并加载刚完成的 recording。
 
-左侧或顶部筛选：
+录制期间以 700 ms polling 刷新当前 recording，不增加 admin activity SSE。每个请求固定一行：
 
 ```text
-Protocol | Outcome | Stream | Date | Body Exact/Partial | Search
+Order | Method | Path | Status/Recording | Total delay
 ```
 
-详情 tabs：
+Replay 时同一列表变成消费队列，显示 consumed / next / pending 以及 `position / total`。点击 Replay 会加载所选 recording 并把 cursor 归零；不再要求逐个绑定 capture。
 
-```text
-Summary | Request | Response | Parsed | Timeline | Raw
-```
-
-Summary 展示 protocol、downstream/upstream URL、status、TTFB、total、bytes、hash 和 redactions。详情提供：
-
-- Timeline：raw records 的 seq、gateway `atUs`、`upstreamObservedAtUs` 和 size；
-- Parsed：non-stream JSON 或通用 SSE event/data 解析视图；
-- Raw：完整 Admin detail payload。
-
-Parsed 与 raw chunk 时间分开显示；当前没有计算“每个 SSE event 由哪些 chunk 贡献”的反向索引。
-
-列表只读取轻量 summary；打开详情后按需 decode request/response/timeline，超过 64 MiB materialization 上限时返回明确错误。用户可以 Import、Save as Scenario、Bind to Replay、Move to Trash；Download、分页 raw 和 Restore 留作后续。
-
-### 13.4 Replay 页面
-
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│ Target [OpenAI Responses ▾]  Stream [On]  Speed [1.0x]                  │
-├──────────────────────────────────┬───────────────────────────────────────┤
-│ Source                           │ Compatibility                          │
-│ ( ) cap_... OpenAI Responses     │ Body Exact · Recorded Timing          │
-│ (●) scn_weather Tool call        │ Transcoded                            │
-│                                  │ ✓ text  ✓ tool call  ✓ usage           │
-│                                  │ ! source stop reason normalized        │
-├──────────────────────────────────┴───────────────────────────────────────┤
-│ Endpoint: http://127.0.0.1:3000/v1/responses           [Copy] [Test]    │
-│ [Activate binding]                                                      │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-同协议完整 capture 默认选择 Body Exact；跨协议时必须显示 conversion report。用户不能在有 warning 时误认为 raw replay。
+保存的 recordings 使用紧凑列表展示时间、协议、请求数和完成数。选择后在同一页面查看队列；点击某一请求才按需加载 request、parsed response 和折叠的 timing/raw detail。Import、Save as Scenario 和 Move to Trash 保留，download/restore/paged raw 后移。
 
 ### 13.5 Scenario Editor
 
@@ -1043,7 +1005,7 @@ Settings：
 - 提示客户端鉴权头会原样透传，capture 副本会脱敏；
 - private network policy；
 - data dir 只读展示与 endpoint enable/disable；
-- admin token 内存输入。
+- Admin listener 暴露策略由服务启动参数管理，Settings 不重复提供 access 配置。
 
 Request tester：
 
@@ -1192,7 +1154,7 @@ DATA_DIR
 VERBOSE
 ```
 
-CLI 入口读取 CLI 参数，容器/`npm start` 入口读取环境变量。mode、enabled endpoints、upstreams 和 bindings 存在 `DATA_DIR/runtime.json`；API key 永不写入 runtime。
+CLI 入口读取 CLI 参数，容器/`npm start` 入口读取环境变量。mode、recording IDs、replay speed、enabled endpoints、upstreams 和兼容 bindings 存在 `DATA_DIR/runtime.json`；API key 永不写入 runtime，replay cursor 不持久化。
 
 Docker 使用多阶段构建：
 
@@ -1230,9 +1192,9 @@ services:
 | --- | --- | --- |
 | 0 | Node 22 + ESM、latest direct deps、Vitest、统一 server bootstrap | legacy path-only verbose global 仍保留；本机无 Docker engine |
 | 1 | 三协议 raw proxy、JSONL capture、body/key redaction、SSRF/DNS pinning、network/chunk timing；已解析到 canonical URL 的 DNS/SSRF/connect preflight 失败也生成 capture | 缺失或非法 upstream 配置无法构造 canonical URL，因而不生成 capture；无独立 upstream timeout policy |
-| 2 | exact raw replay、speed/instant、runtime snapshot、built-ins | 无 prompt matcher、playlist |
+| 2 | recording 顺序回放、原子 cursor、exact raw replay、speed/instant、runtime snapshot、built-ins | 无 per-client session、prompt matcher |
 | 3 | text/function-tool/basic-usage/finish/error 公共 IR 与三协议 compiler | extension IR、strict/best-effort、完整 provider semantics |
-| 4 | list/detail/Parsed/Timeline/import/trash、Save as Scenario、Bind to Replay、Settings、API Test | download/restore/paged raw reader |
+| 4 | 录音机式 Recorder、实时逐行请求、recording 队列、detail/import/trash、Save as Scenario、Settings、API Test | download/restore/paged raw reader |
 | 5 | Text/Markdown/function tool/usage/finish/error/ping 可视化编辑与 server preview | custom tool/reasoning blocks、逐字段 conversion report、完整组件/无障碍测试 |
 | 6 | 双 listener、admin token、secure file permissions、Docker/Compose files、README | Docker image 由 release CI 验证；quota/disk-failure benchmark 与 compatibility client suite 待补 |
 
@@ -1280,17 +1242,17 @@ services:
 
 改动：
 
-1. 实现 active binding 与 per-request runtime snapshot。
+1. 实现 recording 聚合、进程内原子 cursor 与 per-request runtime snapshot；每次请求顺序消费下一条 capture，不做 request matching。
 2. 实现 absolute-time replay scheduler、speed、instant、drain 和 abort。
 3. 迁移已有 mock data 为 built-in scenarios。
-4. 支持完整、partial capture 浏览；partial 不可默认绑定。
+4. 支持完整、partial capture 浏览；partial 不进入 recording replay queue。
 5. 增加 mode 切换和 non-secret runtime persistence。
 
 验收：
 
 - same-protocol replay body hash 与 capture 完全一致；
 - `Body Exact` 仅对 outcome、bytes、headers/trailers 和 termination semantics 全部满足条件的 capture 出现；
-- Body Exact 遇到 effective `stream_options` mismatch 返回 409，不重编 raw bytes；
+- 新请求的 method/path/body/stream options 不参与 recording capture 选择；
 - chunk write 顺序一致，1x timing 在可定义容差内；
 - response 早于 request body end 的 capture 明确显示 `timingReplayable: false`；
 - mode 切换不改变 in-flight request；
@@ -1322,7 +1284,7 @@ services:
 
 1. 实现 loopback admin listener、token 和 Control API。
 2. 实现 capture/scenario list、filter、detail、Parsed/Timeline、import/trash；paged raw、download/restore 后移。
-3. 实现 runtime dashboard、录制页/重放页上下文状态切换、upstream settings、binding page。
+3. 实现单一 Recorder 的录制/回放上下文切换、实时请求行、upstream settings 和兼容 binding 管理。
 4. 实现 request tester 与 raw/parsed stream viewer。
 
 验收：
@@ -1439,14 +1401,14 @@ CI 只检查宽容差和顺序；更严格基准单独运行，避免 flaky test
 
 1. 三个 canonical generation endpoints 的 stream/non-stream 均可在 Replay 工作，并能分别被选为 Recording 的同协议入口；`GET /v1/models` 在 Recording 跟随选中 upstream 透传。
 2. Record 模式不经 JSON parse/re-serialize，不改写 raw request/response body。
-3. 每请求一个独立文件；complete 文件原子落盘，异常 `.partial` 文件可解析、检查并显式标记，不伪装成 complete capture。
+3. 每请求一个独立文件，并带 recording ID/order；complete 文件原子落盘，异常 `.partial` 文件可解析、检查并显式标记，不伪装成 complete capture。
 4. 由 request credential headers/query 提取出的 API key、cookie、URL credentials 不出现在在线生成的 capture、runtime、admin response 或 logs；import 拒绝包含未脱敏 credential headers/URL 的文件。
 5. 同协议 raw replay 的 response body SHA-256 完全相等。
 6. 每个 proxy read chunk 有 seq、byte offset、`bytesBase64`（可直接得到 size）和 monotonic timestamp。
 7. Replay 支持 recorded speed、倍率和 instant，处理 backpressure 与 abort。
 8. Chat `[DONE]`、Responses terminal event、Anthropic message lifecycle 都按各自协议生成，不互相套用。
 9. 跨协议只承诺支持矩阵内语义；当前 unsupported event/type 返回错误，其他转换统一显示 Semantic/Transcoded 通用告警；逐字段 diagnostics 后移。
-10. 默认 built-in scenarios 作为 Replay source 可直接预览和绑定；用户自建 scenario 可编辑。
+10. 未加载 recording 时，默认 built-in scenarios 作为 Replay fallback；用户自建 scenario 可编辑。
 11. 后台可管理指定 root 内文件、查看 raw timeline、import，并把删除项移入同一 data root 的 trash。
 12. 管理后台和 API 一起启动，但默认不把 admin 控制面暴露到公网。
 13. Production gateway 不依赖 provider SDK；协议保真路径只使用 Node.js HTTP primitives。
@@ -1462,8 +1424,9 @@ CI 只检查宽容差和顺序；更严格基准单独运行，避免 flaky test
 | --- | --- |
 | “原封不动”范围 | HTTP entity body bytes + observed read/write schedule，不宣称 packet/frame fidelity |
 | API key | 透传但永不持久化，录制与日志统一 `[REDACTED]` |
-| 默认模式 | `replay`；built-in scenarios 是默认 binding source |
-| 多条录制如何选择 | `(protocol, endpoint, stream)` active binding，默认忽略任意 prompt |
+| 默认模式 | `replay`；未加载 recording 时使用 built-in scenario fallback |
+| 多条录制如何选择 | 后台选择整个 recording；请求按 `recordingOrder` 原子消费，完全忽略新请求内容 |
+| 并发回放 | single-process 共享 cursor；并发调用各自领取唯一的下一条，不建立 per-client session |
 | 同协议与跨协议 | Raw Body Exact 与 Semantic Transcoded 分离 |
 | 跨协议损失 | 当前只编译公共子集并统一标记 Semantic/Transcoded；strict/best-effort 与逐字段 warnings 后移 |
 | Capture 是否可编辑 | 不可编辑；另存 Scenario 后编辑 |

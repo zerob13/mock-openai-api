@@ -139,6 +139,37 @@ describe('RuntimeState mutations', () => {
     })
     expect(await readFile(reloaded.runtimeFile, 'utf8')).not.toContain('"builtin"')
   })
+
+  it('groups one record cycle and atomically drains its replay cursor', async () => {
+    const directory = await temporaryDirectory()
+    const runtime = new RuntimeState(directory)
+    await runtime.load()
+
+    const recording = await runtime.update({ mode: 'record', recordingProtocol: 'openai-responses' })
+    const first = runtime.claimRecording()
+    const second = runtime.claimRecording()
+    expect(first).toMatchObject({ id: recording.activeRecordingId, protocol: 'openai-responses' })
+    expect(second).toMatchObject({ id: recording.activeRecordingId, protocol: 'openai-responses' })
+    expect(second!.order).toBeGreaterThan(first!.order)
+
+    const replay = await runtime.update({ mode: 'replay' })
+    expect(replay.replayRecordingId).toBe(recording.activeRecordingId)
+    expect(runtime.claimReplay(replay.replayRecordingId, ['cap_first123', 'cap_second12'])).toMatchObject({
+      id: 'cap_first123',
+      index: 0,
+      total: 2,
+    })
+    expect(runtime.claimReplay(replay.replayRecordingId, ['cap_first123', 'cap_second12'])).toMatchObject({
+      id: 'cap_second12',
+      index: 1,
+      total: 2,
+    })
+    expect(runtime.claimReplay(replay.replayRecordingId, ['cap_first123', 'cap_second12'])).toBeUndefined()
+    expect(runtime.replayPosition()).toBe(2)
+
+    await runtime.update({ mode: 'replay', replayRecordingId: replay.replayRecordingId })
+    expect(runtime.replayPosition()).toBe(0)
+  })
 })
 
 describe('server security and shutdown', () => {

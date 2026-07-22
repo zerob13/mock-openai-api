@@ -15,6 +15,7 @@ import {
   sanitizeErrorMessage,
   sanitizeHeaders,
   sanitizeUrl,
+  type CaptureSummary,
   type CaptureRecord,
 } from './recording.js'
 import { GATEWAY_PROTOCOLS, type GatewayProtocol, type ReplaySpeed, type UpstreamConfig } from './runtime.js'
@@ -143,12 +144,16 @@ async function importCapture(options: AdminAppOptions, body: Buffer): Promise<Re
 
 async function moveCaptureToTrash(options: AdminAppOptions, id: string): Promise<void> {
   const detail = await options.captures.read(id)
-  const bindings = options.runtime.snapshot().bindings
+  const config = options.runtime.snapshot()
+  const bindings = config.bindings
   const active = GATEWAY_PROTOCOLS.some((protocol) => (
     [bindings[protocol].stream, bindings[protocol].nonstream]
       .some((source) => source.kind === 'capture' && source.id === detail.header.id)
   ))
   if (active) throw new Error('Capture is an active replay binding; bind another source before deleting it')
+  if (config.replayRecordingId === (detail.header.recordingId ?? detail.header.id)) {
+    throw new Error('Capture belongs to the active replay recording; choose another recording before deleting it')
+  }
   const source = path.join(options.capturesDirectory, detail.filename)
   const stats = await lstat(source)
   if (!stats.isFile() || stats.isSymbolicLink()) throw new Error('Capture target must be a regular file')
@@ -169,9 +174,18 @@ async function runtimeView(options: AdminAppOptions): Promise<Record<string, unk
   const config = options.runtime.snapshot()
   const captures = await options.captures.list({ includePartial: true })
   const scenarios = await options.scenarios.list()
+  const replayTotal = captures.filter((capture) => !capture.partial && (
+    capture.recordingId === config.replayRecordingId
+    || (capture.recordingId === undefined && capture.id === config.replayRecordingId)
+  )).length
   return {
     mode: config.mode,
     recordingProtocol: config.recordingProtocol,
+    activeRecordingId: config.activeRecordingId,
+    replayRecordingId: config.replayRecordingId,
+    replaySpeed: config.replaySpeed,
+    replayPosition: options.runtime.replayPosition(config.replayRecordingId),
+    replayTotal,
     revision: config.revision,
     activeRequests: options.metrics.activeRequests,
     apiBaseUrl: options.apiBaseUrl,
@@ -184,6 +198,30 @@ async function runtimeView(options: AdminAppOptions): Promise<Record<string, unk
     partialCount: captures.filter((capture) => capture.partial).length,
     upstreams: runtimeUpstreams(options),
   }
+}
+
+function recordingViews(captures: CaptureSummary[], activeRecordingId: string): Record<string, unknown>[] {
+  const groups = new Map<string, CaptureSummary[]>()
+  for (const capture of captures) {
+    const id = capture.recordingId ?? capture.id
+    const group = groups.get(id) ?? []
+    group.push(capture)
+    groups.set(id, group)
+  }
+  return [...groups].map(([id, requests]) => {
+    requests.sort((left, right) => (left.recordingOrder ?? 0) - (right.recordingOrder ?? 0)
+      || String(left.createdAt).localeCompare(String(right.createdAt)))
+    const first = requests[0]
+    return {
+      id,
+      createdAt: first?.createdAt,
+      protocol: first?.protocol,
+      requestCount: requests.length,
+      completeCount: requests.filter((capture) => !capture.partial).length,
+      active: id === activeRecordingId,
+      requests,
+    }
+  }).sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))
 }
 
 async function bindingView(options: AdminAppOptions): Promise<Record<string, unknown>[]> {
@@ -284,6 +322,10 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
     if (request.body.recordingProtocol !== undefined && !isProtocol(request.body.recordingProtocol)) {
       throw new Error('Recording protocol must be a supported upstream protocol')
     }
+    if (request.body.replaySpeed !== undefined) normalizeReplaySpeed(request.body.replaySpeed)
+    if (request.body.replayRecordingId !== undefined && typeof request.body.replayRecordingId !== 'string') {
+      throw new Error('Replay recording id must be a string')
+    }
     let enabledEndpoints = current.enabledEndpoints
     if (request.body.enabledEndpoints !== undefined) {
       if (!Array.isArray(request.body.enabledEndpoints) || !request.body.enabledEndpoints.every(isProtocol)) {
@@ -318,9 +360,15 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
         throw new Error(`Record mode requires the ${recordingProtocol} endpoint to be enabled`)
       }
     }
+    if (request.body.replayRecordingId) {
+      const captures = await options.captures.listRecording(request.body.replayRecordingId, { includePartial: true })
+      if (!captures.length) throw new Error('Replay recording not found')
+    }
     await options.runtime.update({
-      mode: nextMode,
-      recordingProtocol,
+      mode: request.body.mode,
+      recordingProtocol: request.body.recordingProtocol,
+      replayRecordingId: request.body.replayRecordingId,
+      replaySpeed: request.body.replaySpeed,
       enabledEndpoints,
       upstreams,
     }, request.body.revision)
@@ -329,6 +377,14 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
 
   app.get('/admin/api/captures', asyncRoute(async (_request, response) => {
     response.json(await options.captures.list({ includePartial: true }))
+  }))
+
+  app.get('/admin/api/recordings', asyncRoute(async (_request, response) => {
+    const config = options.runtime.snapshot()
+    response.json(recordingViews(
+      await options.captures.list({ includePartial: true }),
+      config.mode === 'record' ? config.activeRecordingId : '',
+    ))
   }))
 
   app.get('/admin/api/captures/:id', asyncRoute(async (request, response) => {
