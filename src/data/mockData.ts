@@ -1,4 +1,4 @@
-import { MockModel, MockTestCase } from '../types';
+import { MockModel, MockTestCase } from '../types/index.js';
 
 // Thinking model test cases
 const thinkingTestCases: MockTestCase[] = [

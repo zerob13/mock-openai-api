@@ -9,7 +9,23 @@
 
 *中文说明 | [English](README.md)*
 
-一个完整的 OpenAI API 兼容的模拟服务器，无需调用真实的大模型，返回预定义的测试数据。非常适合开发、测试和调试使用 OpenAI API 的应用程序。
+一个面向 OpenAI 与 Anthropic 常用协议的模拟服务器；重放模式无需调用真实模型，可返回内置或已录制的测试数据。
+
+## 录制与重放后台
+
+启动后会同时提供 Mock API `http://127.0.0.1:3000` 和管理后台 `http://127.0.0.1:3001`。Recorder 是主界面：选择任意一个已配置的 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 上游，按下录制，发送任意数量的请求，再按停止。每个完成中或已完成的请求都会实时显示为一行。
+
+录制模式只把同协议原请求和原 key 透传给当前选中的 upstream，`GET /v1/models` 也跟随该上游透传。每次请求仍独立保存为经过凭据脱敏的 `.llmcap.jsonl`，额外标记所属录制和顺序；文件记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。
+
+停止后该次录制会自动装入重放。每个 generation 请求都会原子消费下一条 generation 响应，不匹配 method、path、body、model 或 prompt；五条生成录制只响应前五次调用，第六次返回 `recording_exhausted`，再次点击 Replay 会归零游标。模型发现不消费该游标：`GET /v1/models` 优先重放本次录制中最后一个成功的模型列表，没有时返回内置列表。同协议保留原始 bytes、chunk、headers、状态与延迟；从另一生成协议入口请求时，通过 scenario compiler 转换响应。没有装入录制时，内置样例和手工场景仍作为默认重放数据。
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+支持 `POST /v1/chat/completions`、`POST /v1/responses`、`POST /v1/messages` 和 `GET /v1/models`。客户端只需保持 API key 不变，把 base URL 指向本服务。完整架构、文件格式、协议映射和安全边界见 [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md)。
 
 ## 🚀 快速开始
 
@@ -78,6 +94,10 @@ npx mock-openai-api -p 8080 -H 127.0.0.1 -v
 | ------------------ | ---- | ------------------------ | --------- |
 | `--port <number>`  | `-p` | 服务器端口               | `3000`    |
 | `--host <address>` | `-H` | 服务器主机地址           | `0.0.0.0` |
+| `--admin-port <number>` |      | 管理后台端口         | `3001`    |
+| `--admin-host <address>` |     | 管理后台监听地址     | `127.0.0.1` |
+| `--admin-token <token>` |      | 管理后台 Bearer token；非 loopback 监听时必填 |  |
+| `--data-dir <path>` | `-d` | 录制与场景目录           | `.mock-openai-api` |
 | `--verbose`        | `-v` | 启用请求日志输出到控制台 | `false`   |
 | `--version`        |      | 显示版本号               |           |
 | `--help`           |      | 显示帮助信息             |           |
@@ -101,16 +121,12 @@ npx mock-openai-api --version
 npx mock-openai-api --help
 ```
 
-服务器启动时，会显示正在使用的配置：
+服务器启动时会输出两个 listener 与数据目录：
 
 ```
-🚀 Mock OpenAI API server started successfully!
-📍 Server address: http://0.0.0.0:3000
-⚙️  Configuration:
-   • Port: 3000
-   • Host: 0.0.0.0
-   • Verbose logging: DISABLED
-   • Version: 1.0.1
+Mock API: http://127.0.0.1:3000
+Admin UI: http://127.0.0.1:3001
+Data: /path/to/.mock-openai-api
 ```
 
 ### 基本使用
@@ -149,7 +165,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ## 🎯 特性
 
-- ✅ **完整的 OpenAI API 兼容性**
+- ✅ **兼容 OpenAI Chat、OpenAI Responses 与 Anthropic Messages 网关入口**
 - ✅ **支持流式和非流式聊天完成**
 - ✅ **支持函数调用**
 - ✅ **支持图像生成**
@@ -303,29 +319,27 @@ const newTestCase: MockTestCase = {
 
 ### Docker 部署
 
-创建 `Dockerfile`:
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
-```
-
-构建和运行：
+仓库内置多阶段 `Dockerfile` 和带持久化卷的 Compose 配置。默认容器只对外提供 Mock API；若暴露管理后台，必须设置仅保存在内存中的 token：
 
 ```bash
 docker build -t mock-openai-api .
 docker run -p 3000:3000 mock-openai-api
+
+docker run -p 3000:3000 -p 127.0.0.1:3001:3001 \
+  -e ADMIN_HOST=0.0.0.0 -e ADMIN_TOKEN=change-this-token \
+  -v mock-openai-data:/data mock-openai-api
+
+ADMIN_TOKEN=change-this-token docker compose up -d
 ```
 
 ### 环境变量
 
 - `PORT` - 服务器端口（默认：3000）
 - `HOST` - 服务器主机（默认：0.0.0.0）
+- `ADMIN_PORT` - 管理后台端口（默认：3001）
+- `ADMIN_HOST` - 管理后台监听地址（默认：127.0.0.1）
+- `ADMIN_TOKEN` - 管理后台 Bearer token；非 loopback 监听时必填且不会持久化
+- `DATA_DIR` - 录制与场景持久化目录（默认：`.mock-openai-api`）
 
 ## 🧪 测试
 

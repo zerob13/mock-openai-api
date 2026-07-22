@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
-import { ChatCompletionRequest, ImageGenerationRequest } from '../types';
+import { ChatCompletionRequest, ImageGenerationRequest } from '../types/index.js';
 import {
   getModels,
   createChatCompletion,
   createChatCompletionStream,
   createToolCallResponseStream,
   generateImage
-} from '../services/openaiService';
-import { findModelById } from '../utils/helpers';
+} from '../services/openaiService.js';
+import { findModelById } from '../utils/helpers.js';
 
 /**
  * Get model list

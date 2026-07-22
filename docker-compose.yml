@@ -1,15 +1,22 @@
-version: '3.8'
 services:
   mock-openai-api:
+    build: .
     image: zerob13/mock-openai-api:latest
     container_name: mock-openai-api
     restart: unless-stopped
     ports:
       - "3000:3000"
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - mock-openai-data:/data
     environment:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
+      - ADMIN_PORT=3001
+      - ADMIN_HOST=0.0.0.0
+      - ADMIN_TOKEN=${ADMIN_TOKEN:?Set ADMIN_TOKEN before starting the admin console}
+      - DATA_DIR=/data
       - VERBOSE=false
       - TZ=UTC
     healthcheck:
@@ -35,4 +42,7 @@ services:
 
 networks:
   default:
-    name: mock-openai-network 
+    name: mock-openai-network
+
+volumes:
+  mock-openai-data:
