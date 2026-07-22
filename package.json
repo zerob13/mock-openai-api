@@ -47,9 +47,6 @@
     "node": ">=22.12"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "4.0.18",
-    "@ai-sdk/openai": "4.0.17",
-    "ai": "7.0.34",
     "commander": "15.0.0",
     "cors": "2.8.6",
     "express": "5.2.1"

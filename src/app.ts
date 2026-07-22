@@ -246,14 +246,6 @@ function gatewayHandler(protocol: GatewayProtocol, context: GatewayContext): Req
 
       if (config.mode === 'record') {
         const upstream = config.upstreams[protocol]
-        if (upstream.transport !== 'raw') {
-          response.status(422).json(protocolError(
-            protocol,
-            'AI SDK semantic transport cannot produce a byte-exact capture; choose Raw proxy + capture',
-            'semantic_transport_unsupported',
-          ))
-          return
-        }
         const upstreamUrl = resolveUpstreamUrl(upstream.baseUrl, protocol)
         let target
         try {

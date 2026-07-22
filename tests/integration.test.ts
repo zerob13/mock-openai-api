@@ -331,8 +331,6 @@ describe('startServer integration', () => {
     await updateMode(servers, 'record', [{
       protocol: 'openai-chat',
       baseUrl: 'http://127.0.0.1:9',
-      transport: 'raw',
-      auth: 'passthrough',
       allowPrivateNetwork: false,
     }], ['openai-chat'])
 
@@ -412,8 +410,6 @@ describe('startServer integration', () => {
     await updateMode(servers, 'record', [{
       protocol: 'openai-chat',
       baseUrl: `http://127.0.0.1:${address.port}`,
-      transport: 'raw',
-      auth: 'passthrough',
       allowPrivateNetwork: true,
     }], ['openai-chat'])
 
@@ -596,8 +592,6 @@ describe('startServer integration', () => {
       cases.map(({ protocol }) => ({
         protocol,
         baseUrl: `http://127.0.0.1:${address.port}`,
-        transport: 'raw',
-        auth: 'passthrough',
         allowPrivateNetwork: true,
       })),
       cases.map(({ protocol }) => protocol),
@@ -739,8 +733,6 @@ describe('startServer integration', () => {
     await updateMode(servers, 'record', [{
       protocol: 'openai-chat',
       baseUrl: `http://127.0.0.1:${address.port}`,
-      transport: 'raw',
-      auth: 'passthrough',
       allowPrivateNetwork: true,
     }], ['openai-chat'])
 

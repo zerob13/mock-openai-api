@@ -26,7 +26,7 @@ const status = ref<number | null>(null)
 const responseHeaders = ref<Record<string, string>>({})
 const chunks = ref<ReceivedChunk[]>([])
 const responseText = ref('')
-const snippetType = ref<'curl' | 'sdk' | 'ai-sdk'>('curl')
+const snippetType = ref<'curl' | 'sdk'>('curl')
 let controller: AbortController | null = null
 
 const endpoints: Record<Protocol, string> = {
@@ -63,25 +63,6 @@ const snippet = computed(() => {
       "  -H 'content-type: application/json'",
       `  --data '${body.replaceAll("'", "'\\''")}'`,
     ].join(' \\\n')
-  }
-  if (snippetType.value === 'ai-sdk') {
-    const factory = protocol.value === 'anthropic-messages' ? 'createAnthropic' : 'createOpenAI'
-    const packageName = protocol.value === 'anthropic-messages' ? '@ai-sdk/anthropic' : '@ai-sdk/openai'
-    const method = protocol.value === 'openai-chat' ? '.chat' : protocol.value === 'openai-responses' ? '.responses' : ''
-    return `import { ${factory} } from '${packageName}'
-import { streamText } from 'ai'
-
-const provider = ${factory}({
-  baseURL: '${runtime.state.apiBaseUrl}${protocol.value === 'anthropic-messages' ? '' : '/v1'}',
-  apiKey: process.env.API_KEY,
-})
-
-const result = streamText({
-  model: provider${method}('${model.value}'),
-  prompt: 'Hello from the test console',
-})
-
-for await (const part of result.stream) console.log(part)`
   }
   if (protocol.value === 'anthropic-messages') {
     return `import Anthropic from '@anthropic-ai/sdk'
@@ -280,7 +261,7 @@ onMounted(() => {
     </div>
 
     <article class="panel snippets-panel">
-      <header class="panel-header"><h2>Client example</h2><div class="tab-list" role="tablist"><button :aria-selected="snippetType === 'curl'" @click="snippetType = 'curl'">curl</button><button :aria-selected="snippetType === 'sdk'" @click="snippetType = 'sdk'">{{ protocol === 'anthropic-messages' ? 'Anthropic SDK' : 'OpenAI SDK' }}</button><button :aria-selected="snippetType === 'ai-sdk'" @click="snippetType = 'ai-sdk'">AI SDK</button></div></header>
+      <header class="panel-header"><h2>Client example</h2><div class="tab-list" role="tablist"><button :aria-selected="snippetType === 'curl'" @click="snippetType = 'curl'">curl</button><button :aria-selected="snippetType === 'sdk'" @click="snippetType = 'sdk'">{{ protocol === 'anthropic-messages' ? 'Anthropic SDK' : 'OpenAI SDK' }}</button></div></header>
       <div class="panel-body"><pre class="code-block">{{ snippet }}</pre></div>
     </article>
   </section>

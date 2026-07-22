@@ -21,8 +21,6 @@ export interface ReplayBindings {
 export interface UpstreamConfig {
   protocol: GatewayProtocol
   baseUrl: string
-  transport: 'raw' | 'ai-sdk'
-  auth: 'passthrough'
   allowPrivateNetwork: boolean
 }
 
@@ -48,8 +46,6 @@ function defaultUpstream(protocol: GatewayProtocol): UpstreamConfig {
   return {
     protocol,
     baseUrl: '',
-    transport: 'raw',
-    auth: 'passthrough',
     allowPrivateNetwork: false,
   }
 }
@@ -118,8 +114,6 @@ function normalizeConfig(value: unknown): RuntimeConfig {
       config.upstreams[protocol] = {
         protocol,
         baseUrl: normalizeBaseUrl(candidate.baseUrl),
-        transport: candidate.transport === 'ai-sdk' ? 'ai-sdk' : 'raw',
-        auth: 'passthrough',
         allowPrivateNetwork: candidate.allowPrivateNetwork === true,
       }
     }
@@ -188,7 +182,7 @@ export class RuntimeState {
       if (input.enabledEndpoints) next.enabledEndpoints = [...input.enabledEndpoints]
       for (const protocol of PROTOCOLS) {
         const upstream = input.upstreams?.[protocol]
-        if (upstream) next.upstreams[protocol] = { ...next.upstreams[protocol], ...upstream, protocol, auth: 'passthrough' }
+        if (upstream) next.upstreams[protocol] = { ...next.upstreams[protocol], ...upstream, protocol }
       }
       next.revision += 1
       const persisted = normalizeConfig(next)

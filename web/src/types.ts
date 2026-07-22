@@ -19,8 +19,6 @@ export interface RuntimeState {
 export interface UpstreamConfig {
   protocol: Protocol
   baseUrl: string
-  transport: 'raw' | 'ai-sdk'
-  auth: 'passthrough'
   allowPrivateNetwork: boolean
   status?: 'ready' | 'unchecked' | 'error'
   message?: string

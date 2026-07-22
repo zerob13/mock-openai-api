@@ -1,8 +1,7 @@
 import { lookup as dnsLookup } from 'node:dns/promises'
-import http, { type IncomingMessage } from 'node:http'
+import http from 'node:http'
 import https from 'node:https'
 import { BlockList, isIP, type LookupFunction } from 'node:net'
-import { Readable } from 'node:stream'
 
 const BLOCKED_IPV4 = new BlockList()
 const BLOCKED_IPV6 = new BlockList()
@@ -45,7 +44,6 @@ for (const [network, prefix] of [
 export interface ResolvedNetworkTarget {
   url: URL
   lookup?: LookupFunction
-  address?: string
 }
 
 export function parseUpstreamBaseUrl(rawUrl: string): URL {
@@ -82,14 +80,14 @@ export async function resolveNetworkTarget(
     if (options.all) callback(null, addresses)
     else callback(null, selected.address, selected.family)
   }
-  return { url, lookup: pinnedLookup, address: selected.address }
+  return { url, lookup: pinnedLookup }
 }
 
 export async function probeNetworkTarget(
   rawUrl: string,
   allowPrivateNetwork: boolean,
   timeoutMs = 5_000,
-): Promise<{ status: number; address?: string }> {
+): Promise<{ status: number }> {
   const target = await resolveNetworkTarget(rawUrl, allowPrivateNetwork)
   const transport = target.url.protocol === 'https:' ? https : http
   return new Promise((resolve, reject) => {
@@ -98,63 +96,10 @@ export async function probeNetworkTarget(
       lookup: target.lookup,
     }, (response) => {
       response.resume()
-      response.once('end', () => resolve({ status: response.statusCode ?? 0, address: target.address }))
+      response.once('end', () => resolve({ status: response.statusCode ?? 0 }))
     })
     request.setTimeout(timeoutMs, () => request.destroy(new Error('Upstream check timed out')))
     request.once('error', reject)
     request.end()
   })
-}
-
-function responseHeaders(message: IncomingMessage): Headers {
-  const headers = new Headers()
-  for (let index = 0; index < message.rawHeaders.length; index += 2) {
-    headers.append(message.rawHeaders[index], message.rawHeaders[index + 1])
-  }
-  return headers
-}
-
-export function createSecureFetch(allowPrivateNetwork: boolean, maxRequestBytes = 16 * 1024 * 1024): typeof fetch {
-  return async (input, init) => {
-    const webRequest = new Request(input, init)
-    const target = await resolveNetworkTarget(webRequest.url, allowPrivateNetwork)
-    const body = webRequest.body ? Buffer.from(await webRequest.arrayBuffer()) : undefined
-    if (body && body.byteLength > maxRequestBytes) {
-      throw new Error(`AI SDK request exceeds the ${maxRequestBytes} byte limit`)
-    }
-    const headers: Record<string, string> = {}
-    webRequest.headers.forEach((value, name) => { headers[name] = value })
-    const transport = target.url.protocol === 'https:' ? https : http
-
-    return new Promise<Response>((resolve, reject) => {
-      const request = transport.request(target.url, {
-        method: webRequest.method,
-        headers,
-        lookup: target.lookup,
-      }, (message) => {
-        const status = message.statusCode ?? 500
-        if (status >= 300 && status < 400) {
-          message.resume()
-          reject(new Error('AI SDK upstream redirects are not followed'))
-          return
-        }
-        const responseBody = webRequest.method === 'HEAD' || status === 204 || status === 304
-          ? null
-          : Readable.toWeb(message) as ReadableStream<Uint8Array>
-        resolve(new Response(responseBody, {
-          status,
-          statusText: message.statusMessage,
-          headers: responseHeaders(message),
-        }))
-      })
-      const aborted = (): void => {
-        request.destroy(new DOMException('The operation was aborted', 'AbortError'))
-      }
-      if (webRequest.signal.aborted) aborted()
-      else webRequest.signal.addEventListener('abort', aborted, { once: true })
-      request.once('close', () => webRequest.signal.removeEventListener('abort', aborted))
-      request.once('error', reject)
-      request.end(body)
-    })
-  }
 }

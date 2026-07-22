@@ -105,12 +105,21 @@ describe('RuntimeState mutations', () => {
     await runtime.load()
     const persisted = runtime.snapshot()
     persisted.upstreams['openai-chat'].baseUrl = 'https://api-key:secret@example.com/v1'
+    Object.assign(persisted.upstreams['openai-chat'], { transport: 'legacy', auth: 'legacy' })
     await writeFile(runtime.runtimeFile, `${JSON.stringify(persisted)}\n`)
 
     const reloaded = new RuntimeState(directory)
     await reloaded.load()
     expect(reloaded.snapshot().upstreams['openai-chat'].baseUrl).toBe('')
-    expect(await readFile(reloaded.runtimeFile, 'utf8')).not.toContain('secret')
+    expect(reloaded.snapshot().upstreams['openai-chat']).toEqual({
+      protocol: 'openai-chat',
+      baseUrl: '',
+      allowPrivateNetwork: false,
+    })
+    const normalized = await readFile(reloaded.runtimeFile, 'utf8')
+    expect(normalized).not.toContain('secret')
+    expect(normalized).not.toContain('transport')
+    expect(normalized).not.toContain('auth')
   })
 })
 

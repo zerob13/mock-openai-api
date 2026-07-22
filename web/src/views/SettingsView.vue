@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { checkAiSdkUpstream, checkUpstream, setAdminToken } from '../api'
+import { checkUpstream, setAdminToken } from '../api'
 import { useRuntimeStore } from '../stores/runtime'
 import type { Protocol, UpstreamConfig } from '../types'
 
@@ -16,12 +16,6 @@ const adminToken = ref('')
 const initialized = ref(false)
 const saving = ref(false)
 const checking = ref<Protocol | ''>('')
-const checkingAiSdk = ref<Protocol | ''>('')
-const aiSdkProbe = ref<Record<Protocol, { model: string; apiKey: string; auth: 'api-key' | 'bearer' }>>({
-  'openai-chat': { model: '', apiKey: '', auth: 'bearer' },
-  'openai-responses': { model: '', apiKey: '', auth: 'bearer' },
-  'anthropic-messages': { model: '', apiKey: '', auth: 'api-key' },
-})
 const error = ref('')
 const success = ref('')
 
@@ -29,8 +23,6 @@ function populate(): void {
   upstreams.value = protocols.map(({ id }) => runtime.state.upstreams.find((item) => item.protocol === id) || {
     protocol: id,
     baseUrl: '',
-    transport: 'raw',
-    auth: 'passthrough',
     allowPrivateNetwork: false,
     status: 'unchecked',
   })
@@ -69,42 +61,13 @@ async function verify(upstream: UpstreamConfig): Promise<void> {
     const result = await checkUpstream(upstream)
     upstream.status = result.ok ? 'ready' : 'error'
     upstream.message = result.message || (result.latencyMs != null ? `${result.latencyMs} ms` : undefined)
-    success.value = result.ok ? `${upstream.protocol} endpoint is reachable.` : ''
+    success.value = result.ok ? `${upstream.protocol} base URL is reachable.` : ''
     error.value = result.ok ? '' : (result.message || 'Upstream check failed')
   } catch (cause) {
     upstream.status = 'error'
     error.value = cause instanceof Error ? cause.message : 'Upstream check failed'
   } finally {
     checking.value = ''
-  }
-}
-
-async function verifyAiSdk(upstream: UpstreamConfig): Promise<void> {
-  const probe = aiSdkProbe.value[upstream.protocol]
-  if (!upstream.baseUrl || !probe.model || !probe.apiKey) {
-    error.value = `Enter a base URL, model, and temporary API key for ${upstream.protocol}.`
-    return
-  }
-  checkingAiSdk.value = upstream.protocol
-  try {
-    const result = await checkAiSdkUpstream({
-      ...upstream,
-      model: probe.model,
-      apiKey: probe.apiKey,
-      auth: probe.auth,
-    })
-    upstream.status = result.ok ? 'ready' : 'error'
-    upstream.message = result.ok
-      ? `${result.provider || 'AI SDK'} returned ${JSON.stringify(result.text || '')}.`
-      : 'AI SDK probe failed'
-    success.value = result.ok ? `${upstream.protocol} passed the AI SDK semantic probe.` : ''
-    error.value = result.ok ? '' : 'AI SDK probe failed'
-  } catch (cause) {
-    upstream.status = 'error'
-    error.value = cause instanceof Error ? cause.message : 'AI SDK probe failed'
-  } finally {
-    probe.apiKey = ''
-    checkingAiSdk.value = ''
   }
 }
 
@@ -149,7 +112,7 @@ onMounted(async () => {
 
     <article v-show="initialized" class="panel settings-section">
       <header class="panel-header">
-        <div><h2>Upstream APIs</h2><span class="panel-note">Checks never send a billable model request unless the server explicitly says so.</span></div>
+        <div><h2>Upstream APIs</h2><span class="panel-note">Reachability checks send an unauthenticated HEAD request and never invoke a model.</span></div>
       </header>
       <div class="upstream-grid">
         <section v-for="(upstream, index) in upstreams" :key="upstream.protocol" class="upstream-card">
@@ -165,23 +128,11 @@ onMounted(async () => {
             <input v-model.trim="upstream.baseUrl" type="url" :placeholder="protocols[index].placeholder" spellcheck="false" />
             <small class="field-help">The gateway appends the protocol endpoint path exactly once.</small>
           </label>
-          <div class="two-fields">
-            <label class="field"><span>Transport</span><select v-model="upstream.transport"><option value="raw">Raw proxy + capture</option><option value="ai-sdk">AI SDK semantic probe</option></select></label>
-            <label class="field"><span>Authentication</span><select v-model="upstream.auth" disabled><option value="passthrough">Pass-through client key</option></select></label>
-          </div>
+          <div class="callout">Client authentication headers pass through unchanged and are redacted only in the capture copy.</div>
           <label class="check-row"><input v-model="upstream.allowPrivateNetwork" type="checkbox" /> Allow private-network target</label>
           <p v-if="upstream.message" class="check-message">{{ upstream.message }}</p>
-          <div v-if="upstream.transport === 'ai-sdk'" class="semantic-probe">
-            <div class="callout warning">AI SDK normalizes provider events and cannot create a body-exact capture. Record mode requires Raw proxy + capture. This probe sends one billable request capped at 8 output tokens.</div>
-            <div class="two-fields">
-              <label class="field"><span>Probe model</span><input v-model.trim="aiSdkProbe[upstream.protocol].model" autocomplete="off" placeholder="Model ID" /></label>
-              <label class="field"><span>Temporary API key</span><input v-model="aiSdkProbe[upstream.protocol].apiKey" type="password" autocomplete="off" placeholder="Memory only" /></label>
-              <label v-if="upstream.protocol === 'anthropic-messages'" class="field"><span>Probe auth header</span><select v-model="aiSdkProbe[upstream.protocol].auth"><option value="api-key">x-api-key</option><option value="bearer">Authorization bearer</option></select></label>
-            </div>
-          </div>
           <div class="button-row">
             <var-button size="small" outline :loading="checking === upstream.protocol" @click="verify(upstream)">Check connection</var-button>
-            <var-button v-if="upstream.transport === 'ai-sdk'" size="small" :loading="checkingAiSdk === upstream.protocol" @click="verifyAiSdk(upstream)">Run AI SDK probe</var-button>
           </div>
         </section>
       </div>
@@ -224,9 +175,7 @@ onMounted(async () => {
 .upstream-card:last-child { border-right: 0; }
 .upstream-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .upstream-card h3 { margin: 5px 0 0; font-size: 13px; }
-.two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .check-message { margin: -4px 0 0; color: var(--muted); font-size: 10px; }
-.semantic-probe { display: grid; gap: 10px; }
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .settings-form { display: grid; gap: 15px; }
 .endpoint-options { display: grid; gap: 9px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 9px; }

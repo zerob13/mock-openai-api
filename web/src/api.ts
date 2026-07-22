@@ -132,7 +132,3 @@ export async function putBinding(binding: ReplayBinding): Promise<ReplayBinding[
 export function checkUpstream(upstream: unknown): Promise<{ ok: boolean; latencyMs?: number; message?: string }> {
   return request('/upstreams/check', { method: 'POST', body: JSON.stringify(upstream) })
 }
-
-export function checkAiSdkUpstream(upstream: unknown): Promise<{ ok: boolean; provider?: string; text?: string }> {
-  return request('/upstreams/ai-sdk-check', { method: 'POST', body: JSON.stringify(upstream) })
-}

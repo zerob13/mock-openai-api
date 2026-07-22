@@ -2,7 +2,6 @@ import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, link, lstat, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import express, { type NextFunction, type Request, type Response } from 'express'
-import { checkUpstream } from './ai-sdk.js'
 import {
   captureRequestStream,
   captureToScenario,
@@ -286,17 +285,12 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
         if (!isProtocol(candidate.protocol)) throw new Error('Unsupported upstream protocol')
         if (typeof candidate.baseUrl !== 'string') throw new Error('Upstream baseUrl must be a string')
         if (candidate.baseUrl) parseUpstreamBaseUrl(candidate.baseUrl)
-        if (candidate.transport !== 'raw' && candidate.transport !== 'ai-sdk') {
-          throw new Error('Upstream transport must be raw or ai-sdk')
-        }
         if (typeof candidate.allowPrivateNetwork !== 'boolean') {
           throw new Error('allowPrivateNetwork must be a boolean')
         }
         upstreams[candidate.protocol] = {
           baseUrl: candidate.baseUrl,
-          transport: candidate.transport,
           allowPrivateNetwork: candidate.allowPrivateNetwork,
-          auth: 'passthrough',
         }
       }
     }
@@ -305,9 +299,6 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
       for (const protocol of enabledEndpoints) {
         const upstream = { ...current.upstreams[protocol], ...upstreams[protocol] }
         if (!upstream.baseUrl) throw new Error(`Record mode requires an upstream for ${protocol}`)
-        if (upstream.transport !== 'raw') {
-          throw new Error(`Record mode requires raw transport for ${protocol}`)
-        }
       }
     }
     await options.runtime.update({
@@ -440,29 +431,8 @@ export function createAdminApp(options: AdminAppOptions): express.Express {
     response.json({
       ok: true,
       latencyMs: Math.round(performance.now() - startedAt),
-      message: `Reachable (HTTP ${remote.status}); authentication is checked on the first proxied request`,
+      message: `Base URL reachable (HTTP ${remote.status}); authentication is checked on the first proxied request`,
     })
-  }))
-
-  app.post('/admin/api/upstreams/ai-sdk-check', asyncRoute(async (request, response) => {
-    if (!isProtocol(request.body.protocol)) throw new Error('Upstream protocol is required')
-    if (typeof request.body.baseUrl !== 'string'
-      || typeof request.body.model !== 'string'
-      || typeof request.body.apiKey !== 'string') {
-      throw new Error('baseUrl, model, and apiKey are required')
-    }
-    if (request.body.allowPrivateNetwork !== undefined && typeof request.body.allowPrivateNetwork !== 'boolean') {
-      throw new Error('allowPrivateNetwork must be a boolean')
-    }
-    const result = await checkUpstream({
-      protocol: request.body.protocol,
-      baseUrl: request.body.baseUrl,
-      model: request.body.model,
-      apiKey: request.body.apiKey,
-      auth: request.body.auth === 'bearer' ? 'bearer' : 'api-key',
-      allowPrivateNetwork: request.body.allowPrivateNetwork === true,
-    })
-    response.json({ ok: true, provider: result.provider, text: result.text })
   }))
 
   app.use('/admin/api', (_request, response) => {
