@@ -1,5 +1,5 @@
-import { MockModel, MockTestCase } from '../types';
-import { mockModels } from '../data/mockData';
+import { MockModel, MockTestCase } from '../types/index.js';
+import { mockModels } from '../data/mockData.js';
 
 /**
  * Generate unique chat completion ID
@@ -38,7 +38,6 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   // For markdown model, always return the first test case (the complete markdown example)
   if (model.type === 'markdown') {
     const idx = Math.floor(getCurrentTimestamp() % model.testCases.length)
-    console.log('markdown model', idx);
     return model.testCases[idx];
   }
 

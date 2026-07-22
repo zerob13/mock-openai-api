@@ -7,8 +7,8 @@ import {
   ImageGenerationRequest,
   ImageGenerationResponse,
   ChatMessage
-} from '../types';
-import { mockModels, mockImageUrls } from '../data/mockData';
+} from '../types/index.js';
+import { mockModels, mockImageUrls } from '../data/mockData.js';
 import {
   generateChatCompletionId,
   generateImageId,
@@ -18,7 +18,7 @@ import {
   calculateTokens,
   randomChoice,
   formatErrorResponse
-} from '../utils/helpers';
+} from '../utils/helpers.js';
 /**
  * Get model list
  */

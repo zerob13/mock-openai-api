@@ -1,7 +1,7 @@
 {
   "name": "mock-openai-api",
   "version": "1.0.2",
-  "description": "A mock OpenAI Compatible Provider API server",
+  "description": "Record, inspect, and replay OpenAI and Anthropic API traffic",
   "keywords": [
     "openai",
     "mock",
@@ -20,10 +20,10 @@
   },
   "license": "MIT",
   "author": "zerob13",
-  "type": "commonjs",
-  "main": "dist/index.js",
+  "type": "module",
+  "main": "dist/server/index.js",
   "bin": {
-    "mock-openai-api": "dist/cli.js"
+    "mock-openai-api": "dist/server/cli.js"
   },
   "files": [
     "dist",
@@ -31,23 +31,49 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "ts-node src/index.ts",
-    "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "cli": "ts-node src/cli.ts"
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.json",
+    "build:web": "vite build --config web/vite.config.ts",
+    "dev": "tsx watch src/index.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit && vue-tsc -p web/tsconfig.json --noEmit",
+    "cli": "tsx src/cli.ts"
+  },
+  "engines": {
+    "node": ">=22.12"
   },
   "dependencies": {
-    "commander": "^14.0.0",
-    "cors": "^2.8.5",
-    "express": "^4.18.2"
+    "@ai-sdk/anthropic": "4.0.18",
+    "@ai-sdk/openai": "4.0.17",
+    "ai": "7.0.34",
+    "commander": "15.0.0",
+    "cors": "2.8.6",
+    "express": "5.2.1"
   },
   "devDependencies": {
-    "@types/commander": "^2.12.0",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/node": "^20.0.0",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.6",
+    "@types/node": "26.1.1",
+    "@varlet/ui": "3.19.3",
+    "@vitejs/plugin-vue": "6.0.8",
+    "pinia": "4.0.2",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0",
+    "vue-tsc": "3.3.7"
+  },
+  "overrides": {
+    "axios": "1.18.1",
+    "js-cookie": "3.0.8",
+    "js-yaml": "4.3.0",
+    "lodash": "4.18.1",
+    "uuid": "13.0.1"
   }
 }

@@ -4,15 +4,15 @@ import {
   handleChatCompletion,
   handleImageGeneration,
   handleHealthCheck
-} from '../controllers/openaiController';
-import { handleGeminiRequest } from '../controllers/geminiController';
+} from '../controllers/openaiController.js';
+import { handleGeminiRequest } from '../controllers/geminiController.js';
 
 const router = Router();
 
 // Debug middleware to log all requests to this router
 router.use((req, res, next) => {
   if (global.verboseLogging) {
-    console.log(`Router - ${req.method} ${req.path} (originalUrl: ${req.originalUrl})`);
+    console.log(`Router - ${req.method} ${req.path}`);
   }
   next();
 });

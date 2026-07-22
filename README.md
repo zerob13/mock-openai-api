@@ -12,7 +12,24 @@
 
 *[中文说明](README.zh.md) | English*
 
-A complete OpenAI API compatible mock server that returns predefined test data without calling real LLMs. Perfect for developing, testing, and debugging applications that use the OpenAI API.
+A focused OpenAI and Anthropic API mock server that returns predefined or recorded test data without calling a real model in built-in/replay mode.
+
+## Record and replay console
+
+The server now starts two listeners:
+
+- Mock API: `http://127.0.0.1:3000`
+- Admin console: `http://127.0.0.1:3001`
+
+Open the admin console to switch between Built-in, Record, and Replay modes. Record mode forwards the original request and key to the configured upstream while storing one credential-redacted `.llmcap.jsonl` file per request. Response bytes, SSE read chunks, headers, status, and relative timestamps are retained for body-exact same-protocol replay. Captures can also be decoded into protocol-neutral scenarios and replayed as OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages.
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+Supported gateway endpoints are `POST /v1/chat/completions`, `POST /v1/responses`, and `POST /v1/messages`. Keep the client API key unchanged and point its base URL at this server. The full architecture, file schema, protocol mapping, security boundaries, and delivery plan are documented in [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md).
 
 ## 🚀 Quick Start
 
@@ -57,37 +74,30 @@ docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:latest
 
 # Run with timezone setting
 docker run -p 3000:3000 -e TZ=Asia/Shanghai zerob13/mock-openai-api:latest
+
+# Expose the admin console safely (the token is never persisted)
+docker run -p 3000:3000 -p 127.0.0.1:3001:3001 \
+  -e ADMIN_HOST=0.0.0.0 -e ADMIN_TOKEN=change-this-token \
+  -v mock-openai-data:/data zerob13/mock-openai-api:latest
 ```
 
 Available environment variables:
 - `PORT`: Server port (default: 3000)
 - `HOST`: Server host (default: 0.0.0.0)  
 - `VERBOSE`: Enable verbose logging (default: false)
+- `ADMIN_PORT`: Admin console port (default: 3001)
+- `ADMIN_HOST`: Admin console host (default: 127.0.0.1)
+- `ADMIN_TOKEN`: Admin API bearer token (never persisted); required whenever `ADMIN_HOST` is not loopback
+- `DATA_DIR`: Capture and scenario directory (default: `.mock-openai-api`)
 - `TZ`: Timezone setting (default: UTC)
 - `NODE_ENV`: Node.js environment (default: production)
 
 ### Method 3: Docker Compose
 
-Create a `docker-compose.yml` file:
-
-```yaml
-version: '3.8'
-services:
-  mock-openai-api:
-    image: zerob13/mock-openai-api:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000
-      - HOST=0.0.0.0
-      - VERBOSE=false
-    restart: unless-stopped
-```
-
-Then run:
+The repository includes a Compose file that persists `/data` and exposes Admin only on host loopback. Set a token before starting it:
 
 ```bash
-docker-compose up -d
+ADMIN_TOKEN=change-this-token docker compose up -d
 ```
 
 ### Method 4: NPM Installation
@@ -133,6 +143,10 @@ npx mock-openai-api -p 8080 -H 127.0.0.1 -v
 | ------------------ | ----- | --------------------------------- | --------- |
 | `--port <number>`  | `-p`  | Server port                       | `3000`    |
 | `--host <address>` | `-H`  | Server host address               | `0.0.0.0` |
+| `--admin-port <number>` | | Admin console port | `3001` |
+| `--admin-host <address>` | | Admin console host | `127.0.0.1` |
+| `--admin-token <token>` | | Admin bearer token; required for non-loopback host | |
+| `--data-dir <path>` | `-d` | Capture and scenario directory | `.mock-openai-api` |
 | `--verbose`        | `-v`  | Enable request logging to console | `false`   |
 | `--version`        |       | Show version number               |           |
 | `--help`           |       | Show help information             |           |
@@ -156,16 +170,12 @@ npx mock-openai-api --version
 npx mock-openai-api --help
 ```
 
-When the server starts, it will display the configuration being used:
+When the server starts, it prints both listeners and the data directory:
 
 ```
-🚀 Mock OpenAI API server started successfully!
-📍 Server address: http://0.0.0.0:3000
-⚙️  Configuration:
-   • Port: 3000
-   • Host: 0.0.0.0
-   • Verbose logging: DISABLED
-   • Version: 1.0.1
+Mock API: http://127.0.0.1:3000
+Admin UI: http://127.0.0.1:3001
+Data: /path/to/.mock-openai-api
 ```
 
 ### Basic Usage
@@ -204,7 +214,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ## 🎯 Features
 
-- ✅ **Full OpenAI API Compatibility**
+- ✅ **OpenAI Chat, OpenAI Responses, and Anthropic Messages gateway compatibility**
 - ✅ **Support for streaming and non-streaming chat completions**
 - ✅ **Function calling support**
 - ✅ **Image generation support**
@@ -367,51 +377,10 @@ Pre-built Docker images are available on Docker Hub and automatically updated wi
 docker pull zerob13/mock-openai-api:latest
 
 # Specific version
-docker pull zerob13/mock-openai-api:v1.0.1
+docker pull zerob13/mock-openai-api:v1.0.2
 
 # Run the container
 docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:latest
-```
-
-### Production Deployment
-
-```bash
-# Production deployment with custom configuration
-docker run -d \
-  --name mock-openai-api \
-  --restart unless-stopped \
-  -p 3000:3000 \
-  -e NODE_ENV=production \
-  -e PORT=3000 \
-  -e HOST=0.0.0.0 \
-  zerob13/mock-openai-api:latest
-
-# Health check
-curl http://localhost:3000/health
-```
-
-### Docker Compose (Production Ready)
-
-```yaml
-version: '3.8'
-services:
-  mock-openai-api:
-    image: zerob13/mock-openai-api:latest
-    container_name: mock-openai-api
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - HOST=0.0.0.0
-      - VERBOSE=false
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1); }).on('error', () => process.exit(1));"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 ```
 
 ### Build from Source
@@ -435,6 +404,10 @@ docker run -p 3000:3000 my-mock-openai-api
 - `NODE_ENV` - Node environment (default: production)
 - `PORT` - Server port (default: 3000)
 - `HOST` - Server host (default: 0.0.0.0)
+- `ADMIN_PORT` - Admin console port (default: 3001)
+- `ADMIN_HOST` - Admin listener (default: 127.0.0.1)
+- `ADMIN_TOKEN` - Required bearer token when Admin is not bound to loopback
+- `DATA_DIR` - Capture and scenario directory (default: `.mock-openai-api`)
 - `VERBOSE` - Enable verbose logging (default: false)
 
 ## 🧪 Testing
