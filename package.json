@@ -1,6 +1,6 @@
 {
   "name": "mock-openai-api",
-  "version": "1.0.2",
+  "version": "1.0.6",
   "description": "Record, inspect, and replay OpenAI and Anthropic API traffic",
   "keywords": [
     "openai",
@@ -27,6 +27,7 @@
   },
   "files": [
     "dist",
+    "docs/images/admin-recorder.png",
     "README.md",
     "LICENSE"
   ],

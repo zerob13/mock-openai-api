@@ -1,6 +1,8 @@
 # Mock OpenAI API
 
 [![NPM Version](https://img.shields.io/npm/v/mock-openai-api)](https://www.npmjs.com/package/mock-openai-api)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zerob13/mock-openai-api)](https://hub.docker.com/r/zerob13/mock-openai-api)
+[![GitHub Release](https://img.shields.io/github/v/release/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/releases)
 [![GitHub License](https://img.shields.io/github/license/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-404D59?style=flat&logo=express&logoColor=white)](https://expressjs.com/)
@@ -19,6 +21,18 @@
 
 停止后该次录制会自动装入重放。每个 generation 请求都会原子消费下一条 generation 响应，不匹配 method、path、body、model 或 prompt；五条生成录制只响应前五次调用，第六次返回 `recording_exhausted`，再次点击 Replay 会归零游标。模型发现不消费该游标：`GET /v1/models` 优先重放本次录制中最后一个成功的模型列表，没有时返回内置列表。同协议保留原始 bytes、chunk、headers、状态与延迟；从另一生成协议入口请求时，通过 scenario compiler 转换响应。没有装入录制时，内置样例和手工场景仍作为默认重放数据。
 
+![包含五条请求重放列表的 Web 管理后台](docs/images/admin-recorder.png)
+
+内置 Web 管理后台提供：
+
+- **Recorder**：开始和停止有序录制，查看脱敏后的请求与响应，导入 capture，并把 capture 移入回收目录。
+- **Replay playlist**：把完整 recording 或单条请求拖入队列并重排，支持顺序、随机、单条循环和列表循环。
+- **Scenario Editor**：编辑 text、tool call、usage、finish、error 与 ping 时间线，并预览为 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 输出。
+- **API Test**：发送流式或非流式请求，查看原始响应、headers、SSE event 与浏览器 chunk 时间线，并生成 curl 或 SDK 示例。
+- **Settings**：分别配置三种协议的 upstream，手动检查连通性，按需允许私网目标，并启用或禁用网关入口。
+
+Web 管理后台同时包含在 npm 包和 Docker 镜像中，支持桌面、移动端以及明暗主题。Admin 默认只监听 loopback；对外暴露时必须设置仅保存在内存中的 bearer token。
+
 ```bash
 npm install
 npm run build
@@ -29,29 +43,24 @@ npm start
 
 ## 🚀 快速开始
 
-### 方法 1：公共服务（无需安装配置）
-
-最快的使用方式是直接使用我们的公共部署服务：
-
-**服务地址**: `https://mockllm.anya2a.com/v1`  
-**API密钥**: `DeepChat`
+### 方法 1：Docker
 
 ```bash
-# 测试公共服务
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
+docker run -p 3000:3000 zerob13/mock-openai-api:1.0.6
 
-# 聊天完成示例
-curl -X POST https://mockllm.anya2a.com/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer DeepChat" \
-  -d '{
-    "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "你好"}]
-  }'
+# 安全暴露管理后台
+docker run -p 3000:3000 -p 127.0.0.1:3001:3001 \
+  -e ADMIN_HOST=0.0.0.0 -e ADMIN_TOKEN=change-this-token \
+  -v mock-openai-data:/data zerob13/mock-openai-api:1.0.6
 ```
 
-### 方法 2：NPM 安装（本地部署）
+### 方法 2：Docker Compose
+
+```bash
+ADMIN_TOKEN=change-this-token docker compose up -d
+```
+
+### 方法 3：NPM 安装（本地部署）
 
 ```bash
 npm install -g mock-openai-api
@@ -63,7 +72,7 @@ npm install -g mock-openai-api
 npx mock-openai-api
 ```
 
-服务器将在 `http://localhost:3000` 启动。
+Mock API 会在 `http://localhost:3000` 启动，Web 管理后台会在 `http://127.0.0.1:3001` 启动。
 
 ## ⚙️ CLI 选项
 
@@ -170,6 +179,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 - ✅ **支持函数调用**
 - ✅ **支持图像生成**
 - ✅ **预定义的测试场景**
+- ✅ **内置录制、重放列表、场景编辑与 API 测试 Web 管理后台**
 - ✅ **TypeScript 编写**
 - ✅ **易于集成和部署**
 - ✅ **详细的错误处理**
@@ -346,11 +356,6 @@ ADMIN_TOKEN=change-this-token docker compose up -d
 ### 使用 curl 测试
 
 ```bash
-# 测试公共服务
-curl https://mockllm.anya2a.com/health
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
-
 # 测试本地服务
 curl http://localhost:3000/health
 curl http://localhost:3000/v1/models
@@ -404,14 +409,8 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```javascript
 import OpenAI from 'openai';
 
-// 使用公共服务
+// 使用本地部署
 const client = new OpenAI({
-  baseURL: 'https://mockllm.anya2a.com/v1',
-  apiKey: 'DeepChat'
-});
-
-// 或使用本地部署
-const localClient = new OpenAI({
   baseURL: 'http://localhost:3000/v1',
   apiKey: 'mock-key' // 可以是任意值
 });

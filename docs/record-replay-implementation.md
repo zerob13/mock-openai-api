@@ -954,6 +954,10 @@ Varlet 偏 mobile-first，首版桌面布局使用固定 CSS grid，不增加 re
 
 顶部只显示醒目的当前状态，不提供全局 mode 下拉。Recorder 是唯一的录制/回放控制面；Dashboard 与独立 Replay 页面从主导航移除。桌面使用窄侧栏，移动端使用四项底部导航。
 
+![Recorder 与五条请求组成的 replay playlist](images/admin-recorder.png)
+
+当前 Web 管理后台已交付 Recorder、Replay playlist、Scenario Editor、API Test 和 Settings。Replay playlist 支持整组 recording 与单条 request 混排、拖拽或键盘重排、顺序或随机播放、单条或整组循环；API Test 会展示 raw response、headers、SSE event 与浏览器实际接收的 chunk timeline。
+
 ### 13.3 Recorder 页面
 
 页面首部像录音机：从已配置 upstream 中选择一个协议，使用一个高辨识度的 Record/Stop 主按钮。每次开始都生成新 recording；Stop 自动切到 Replay 并加载刚完成的 recording。

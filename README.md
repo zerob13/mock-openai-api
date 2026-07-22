@@ -2,7 +2,8 @@
 
 [![NPM Version](https://img.shields.io/npm/v/mock-openai-api)](https://www.npmjs.com/package/mock-openai-api)
 [![Docker Pulls](https://img.shields.io/docker/pulls/zerob13/mock-openai-api)](https://hub.docker.com/r/zerob13/mock-openai-api)
-[![Docker Image Size](https://img.shields.io/docker/image-size/zerob13/mock-openai-api/latest)](https://hub.docker.com/r/zerob13/mock-openai-api)
+[![Docker Image Size](https://img.shields.io/docker/image-size/zerob13/mock-openai-api/1.0.6)](https://hub.docker.com/r/zerob13/mock-openai-api)
+[![GitHub Release](https://img.shields.io/github/v/release/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/releases)
 [![GitHub License](https://img.shields.io/github/license/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-404D59?style=flat&logo=express&logoColor=white)](https://expressjs.com/)
@@ -25,6 +26,18 @@ The Recorder is the primary workflow. Press Record to start a new ordered record
 
 Stopping automatically loads that recording for replay. Each incoming generation call atomically consumes the next recorded generation response without matching its method, path, body, model, or prompt. The sixth call to a five-generation-call recording returns `recording_exhausted`; pressing Replay rewinds the cursor. Model discovery does not consume that cursor: `GET /v1/models` replays the latest successful model-list capture in the recording, or falls back to the built-in list. Same-protocol responses retain their original bytes, chunks, headers, status, and relative timing. A generation response requested through another supported protocol is transcoded through the scenario compiler. Built-in examples and manually edited scenarios remain available as the fallback when no recording is loaded.
 
+![Web admin Recorder with a five-request replay playlist](docs/images/admin-recorder.png)
+
+The built-in Web admin provides:
+
+- **Recorder** — start and stop ordered recordings, inspect redacted requests and responses, import captures, and move captures to trash.
+- **Replay playlist** — drag complete recordings or individual requests into a queue, reorder them, choose sequential or shuffled playback, and repeat one or all entries.
+- **Scenario Editor** — create text, tool-call, usage, finish, error, and ping timelines, then validate and preview them as OpenAI Chat, OpenAI Responses, or Anthropic Messages output.
+- **API Test** — send streaming or non-streaming requests, inspect raw responses, headers, SSE events, and browser chunk timing, and copy curl or SDK examples.
+- **Settings** — configure an upstream for each protocol, run an explicit reachability check, allow private-network targets when needed, and enable or disable gateway endpoints.
+
+The Web admin is bundled into both the npm package and Docker image. It supports desktop and mobile layouts plus light and dark themes. Admin access stays on loopback by default; exposing it requires an in-memory bearer token.
+
 ```bash
 npm install
 npm run build
@@ -35,52 +48,30 @@ Supported gateway endpoints are `POST /v1/chat/completions`, `POST /v1/responses
 
 ## 🚀 Quick Start
 
-### Method 1: Public Service (No Setup Required)
-
-The quickest way to get started is using our public deployment service:
-
-**Base URL**: `https://mockllm.anya2a.com/v1`  
-**API Key**: `DeepChat`
-
-```bash
-# Test the public service
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
-
-# Chat completion example
-curl -X POST https://mockllm.anya2a.com/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer DeepChat" \
-  -d '{
-    "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
-```
-
-### Method 2: Docker (Recommended for Local Development)
+### Method 1: Docker (Recommended for Local Development)
 
 The easiest way to run Mock OpenAI API locally is using Docker from [Docker Hub](https://hub.docker.com/r/zerob13/mock-openai-api):
 
 ```bash
-# Pull and run the latest image
-docker run -p 3000:3000 zerob13/mock-openai-api:latest
+# Pull and run version 1.0.6
+docker run -p 3000:3000 zerob13/mock-openai-api:1.0.6
 
 # Run with custom port
-docker run -p 8080:3000 zerob13/mock-openai-api:latest
+docker run -p 8080:3000 zerob13/mock-openai-api:1.0.6
 
 # Run with verbose logging
-docker run -p 3000:3000 -e VERBOSE=true zerob13/mock-openai-api:latest
+docker run -p 3000:3000 -e VERBOSE=true zerob13/mock-openai-api:1.0.6
 
 # Run in background (detached mode)
-docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:latest
+docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:1.0.6
 
 # Run with timezone setting
-docker run -p 3000:3000 -e TZ=Asia/Shanghai zerob13/mock-openai-api:latest
+docker run -p 3000:3000 -e TZ=Asia/Shanghai zerob13/mock-openai-api:1.0.6
 
 # Expose the admin console safely (the token is never persisted)
 docker run -p 3000:3000 -p 127.0.0.1:3001:3001 \
   -e ADMIN_HOST=0.0.0.0 -e ADMIN_TOKEN=change-this-token \
-  -v mock-openai-data:/data zerob13/mock-openai-api:latest
+  -v mock-openai-data:/data zerob13/mock-openai-api:1.0.6
 ```
 
 Available environment variables:
@@ -94,7 +85,7 @@ Available environment variables:
 - `TZ`: Timezone setting (default: UTC)
 - `NODE_ENV`: Node.js environment (default: production)
 
-### Method 3: Docker Compose
+### Method 2: Docker Compose
 
 The repository includes a Compose file that persists `/data` and exposes Admin only on host loopback. Set a token before starting it:
 
@@ -102,7 +93,7 @@ The repository includes a Compose file that persists `/data` and exposes Admin o
 ADMIN_TOKEN=change-this-token docker compose up -d
 ```
 
-### Method 4: NPM Installation
+### Method 3: NPM Installation
 
 ```bash
 npm install -g mock-openai-api
@@ -114,7 +105,7 @@ npm install -g mock-openai-api
 npx mock-openai-api
 ```
 
-The server will start at `http://localhost:3000`.
+The Mock API starts at `http://localhost:3000`; the Web admin starts at `http://127.0.0.1:3001`.
 
 ## ⚙️ CLI Options
 
@@ -221,6 +212,7 @@ curl -X POST http://localhost:3000/v1/images/generations \
 - ✅ **Function calling support**
 - ✅ **Image generation support**
 - ✅ **Predefined test scenarios**
+- ✅ **Built-in Web admin for recording, replay playlists, scenario editing, and API testing**
 - ✅ **Written in TypeScript**
 - ✅ **Docker support with multi-arch images (AMD64/ARM64)**
 - ✅ **Easy integration and deployment**
@@ -375,11 +367,11 @@ const newTestCase: MockTestCase = {
 Pre-built Docker images are available on Docker Hub and automatically updated with each release:
 
 ```bash
-# Latest stable version
-docker pull zerob13/mock-openai-api:latest
+# Version 1.0.6
+docker pull zerob13/mock-openai-api:1.0.6
 
-# Specific version
-docker pull zerob13/mock-openai-api:v1.0.2
+# Rolling default-branch build
+docker pull zerob13/mock-openai-api:latest
 
 # Run the container
 docker run -d -p 3000:3000 --name mock-openai-api zerob13/mock-openai-api:latest
@@ -417,11 +409,6 @@ docker run -p 3000:3000 my-mock-openai-api
 ### Testing with curl
 
 ```bash
-# Test public service
-curl https://mockllm.anya2a.com/health
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
-
 # Test local service
 curl http://localhost:3000/health
 curl http://localhost:3000/v1/models
@@ -475,14 +462,8 @@ curl -X POST http://localhost:3000/v1/images/generations \
 ```javascript
 import OpenAI from 'openai';
 
-// Using the public service
+// Using the local deployment
 const client = new OpenAI({
-  baseURL: 'https://mockllm.anya2a.com/v1',
-  apiKey: 'DeepChat'
-});
-
-// Or using local deployment
-const localClient = new OpenAI({
   baseURL: 'http://localhost:3000/v1',
   apiKey: 'mock-key' // can be any value
 });

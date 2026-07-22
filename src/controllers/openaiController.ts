@@ -185,6 +185,6 @@ export function handleHealthCheck(req: Request, res: Response) {
     status: 'ok',
     message: 'Mock OpenAI API server is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.6'
   });
 } 

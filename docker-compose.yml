@@ -1,7 +1,7 @@
 services:
   mock-openai-api:
     build: .
-    image: zerob13/mock-openai-api:latest
+    image: zerob13/mock-openai-api:1.0.6
     container_name: mock-openai-api
     restart: unless-stopped
     ports:
