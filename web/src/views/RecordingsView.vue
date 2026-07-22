@@ -47,6 +47,10 @@ const shownRecording = computed(() => {
 })
 const replayingShownRecording = computed(() => runtime.state.mode === 'replay'
   && shownRecording.value?.id === runtime.state.replayRecordingId)
+const shownRequests = computed(() => {
+  const requests = shownRecording.value?.requests ?? []
+  return runtime.state.mode === 'record' ? requests : requests.filter(isGenerationCapture)
+})
 const endpoint = computed(() => `${runtime.state.apiBaseUrl}${protocols[recordingProtocol.value].endpoint}`)
 
 watch(configuredUpstreams, (upstreams) => {
@@ -62,6 +66,16 @@ function pathOf(capture: CaptureSummary): string {
   } catch {
     return capture.downstreamUrl || 'Captured request'
   }
+}
+
+function isGenerationCapture(capture: CaptureSummary): boolean {
+  const path = pathOf(capture).split('?')[0]
+  return Object.values(protocols).some((protocol) => protocol.endpoint === path)
+    || path === '/chat/completions'
+}
+
+function replayRequestCount(recording: RecordingSummary): number {
+  return recording.requests.filter(isGenerationCapture).length
 }
 
 function humanTime(value?: number): string {
@@ -123,7 +137,7 @@ async function toggleRecording(): Promise<void> {
 }
 
 async function replay(recording: RecordingSummary): Promise<void> {
-  if (!recording.completeCount) return
+  if (!replayRequestCount(recording)) return
   switching.value = true
   try {
     await runtime.update({ mode: 'replay', replayRecordingId: recording.id })
@@ -264,7 +278,7 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
             <span v-if="replayingShownRecording" class="badge" :class="runtime.state.replayPosition >= runtime.state.replayTotal ? 'success' : 'warning'">
               {{ runtime.state.replayPosition >= runtime.state.replayTotal ? 'Finished' : `${runtime.state.replayPosition}/${runtime.state.replayTotal}` }}
             </span>
-            <var-button size="small" :loading="switching" :disabled="!shownRecording.completeCount" @click="replay(shownRecording)">
+            <var-button size="small" :loading="switching" :disabled="!replayRequestCount(shownRecording)" @click="replay(shownRecording)">
               {{ replayingShownRecording && runtime.state.replayPosition > 0 ? 'Replay again' : 'Replay' }}
             </var-button>
           </template>
@@ -275,12 +289,15 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
       <div v-else-if="!shownRecording" class="empty-state">
         <div><strong>Nothing recorded yet</strong>Choose an upstream and press the red button.</div>
       </div>
+      <div v-else-if="!shownRequests.length" class="empty-state compact">
+        <div><strong>No generation requests</strong>Model discovery is replayed separately from this queue.</div>
+      </div>
       <div v-else class="table-scroll">
         <table class="data-table request-table">
           <thead><tr><th>#</th><th>Request</th><th>Response</th><th>Time</th></tr></thead>
           <tbody>
             <tr
-              v-for="(capture, index) in shownRecording.requests"
+              v-for="(capture, index) in shownRequests"
               :key="capture.id"
               :class="{
                 'is-selected': selectedCapture?.id === capture.id,

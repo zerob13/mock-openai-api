@@ -177,7 +177,7 @@ async function runtimeView(options: AdminAppOptions): Promise<Record<string, unk
   const replayTotal = captures.filter((capture) => !capture.partial && (
     capture.recordingId === config.replayRecordingId
     || (capture.recordingId === undefined && capture.id === config.replayRecordingId)
-  )).length
+  ) && capture.valid && isGenerationCapture(capture)).length
   return {
     mode: config.mode,
     recordingProtocol: config.recordingProtocol,
@@ -198,6 +198,11 @@ async function runtimeView(options: AdminAppOptions): Promise<Record<string, unk
     partialCount: captures.filter((capture) => capture.partial).length,
     upstreams: runtimeUpstreams(options),
   }
+}
+
+function isGenerationCapture(capture: CaptureSummary): boolean {
+  return capture.protocol !== undefined
+    && captureMatchesEndpoint(capture.downstreamUrl ?? '', capture.protocol)
 }
 
 function recordingViews(captures: CaptureSummary[], activeRecordingId: string): Record<string, unknown>[] {

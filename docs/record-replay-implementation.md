@@ -19,7 +19,7 @@
 - Record 模式只有一条 Node.js raw HTTP transport，不提供会解析或归一化事件的替代路径。
 - 非 loopback Admin listener 必须配置 bearer token，否则进程拒绝启动。
 - public upstream 默认执行 DNS 解析、private/special-use 地址拒绝和连接地址 pinning；本地 upstream 必须显式打开 `allowPrivateNetwork`。
-- 选中的 recording 由一组带 `recordingId` / `recordingOrder` 的独立 capture 构成；Replay 使用进程内原子 cursor 顺序消费，不检查新请求的 method、path、body、model 或 prompt。
+- 选中的 recording 由一组带 `recordingId` / `recordingOrder` 的独立 capture 构成；generation Replay 使用进程内原子 cursor 顺序消费，不检查新请求的 method、path、body、model 或 prompt。模型发现不占用该 cursor。
 - 同协议 capture 直接 raw replay；跨 generation 协议时才解析 capture 并编译为目标协议。旧 binding 和 built-in scenario 只在没有加载 recording 时作为兼容 fallback。
 - 当前是 single-process / single-writer 文件存储；不支持多个进程共享同一 data directory。
 
@@ -58,7 +58,7 @@
 3. 默认透传客户端原来的鉴权头；客户端只需要把 `baseURL` 改为本服务地址。
 4. 每个请求写入一个独立、可恢复、可校验的录制文件，并用 `recordingId` / `recordingOrder` 归入同一次录制。
 5. 完整记录 request/response body bytes、状态、headers、错误、取消和每个 chunk 的单调时钟时间点。
-6. Replay 模式下按一次录制的请求顺序逐个重放；每个新请求原子消费下一条响应，保留录制延迟并支持倍率播放。
+6. Replay 模式下按一次录制的 generation 请求顺序逐个重放；每个新 generation 请求原子消费下一条响应，保留录制延迟并支持倍率播放。模型列表独立重放。
 7. 把可支持的文本、Markdown、tool call、usage 和结束原因转换为另外两种协议。
 8. 默认以已有 mock 数据生成内置 scenario；服务启动后即可使用。
 9. 同进程启动 API listener 和管理后台 listener；Recorder 页面在一个录音机式界面中完成录制、实时逐行展示、停止、选择录制和顺序回放。
@@ -91,7 +91,7 @@
 | Docker 没有持久化目录 | 容器重建丢录制 | 显式挂载 `/data`，多阶段构建 web/server |
 | API 默认 wildcard CORS | 不能直接复用为高权限控制面 | API 与 admin 使用独立 app、listener 和 CORS 策略 |
 
-新的 gateway 接管 `/v1/chat/completions` 与无 `/v1` alias；三个 built-in scenarios 是为新编译器重建的 text、Markdown、tool-call 样例，并未逐条迁移旧 `mockData.ts`。Replay 状态下 models 继续由 legacy router 提供内置列表；Recording 状态下 `/v1/models` 跟随选中的 upstream 透传并录制。旧 images、Gemini 等 route 继续保持兼容，图片路由不在本功能范围内。
+新的 gateway 接管 `/v1/chat/completions` 与无 `/v1` alias；三个 built-in scenarios 是为新编译器重建的 text、Markdown、tool-call 样例，并未逐条迁移旧 `mockData.ts`。Recording 状态下 `/v1/models` 跟随选中的 upstream 透传并录制；Replay 优先返回当前 recording 最后一个成功的 models capture，没有时由 legacy router 提供内置列表，且不推进 generation cursor。旧 images、Gemini 等 route 继续保持兼容，图片路由不在本功能范围内。
 
 ## 4. 协议调研结论
 
@@ -297,7 +297,7 @@ Browser ── HTTP ──> Admin listener ──> Control API / static Vue app 
 运行状态定义：
 
 - `record`：选择一个 `recordingProtocol` 并创建新的 `activeRecordingId`。匹配的生成入口透明代理到该协议 upstream；`/v1/models` 跟随同一 upstream。每个请求独立落盘，并领取单调递增的 `recordingOrder`。
-- `replay`：默认状态。加载一个 `replayRecordingId`，每个新请求原子领取 cursor 指向的下一条 capture；请求内容不参与选择。三个内置样例和旧 binding 仅在没有加载 recording 时作为 fallback。
+- `replay`：默认状态。加载一个 `replayRecordingId`，每个新 generation 请求原子领取 cursor 指向的下一条 generation capture；请求内容不参与选择。Models capture 独立读取，不推进 cursor。三个内置样例和旧 binding 仅在没有可用 generation capture 时作为 fallback。
 
 每个请求在收到 headers 时获取一次不可变 runtime snapshot。后台切换模式只影响后续请求，不改变 in-flight request。
 
@@ -662,7 +662,9 @@ Markdown 在线路协议里仍是普通文本；编辑器用 `format: "markdown"
 
 一次 Record 按钮周期就是一个 recording。它不增加 manifest 文件，而是从 capture header 的 `recordingId` / `recordingOrder` 动态聚合；旧文件缺少这两个字段时，兼容为只有一个请求的 recording。
 
-进入 Replay 后，runtime 保存选中的 `replayRecordingId` 和进程内 cursor。任何受支持的 API 请求到达时都会原子领取下一条 capture，选择过程不读取、不比较 method、path、body、model、prompt、`stream` 或 `stream_options`。入口只决定跨 generation 协议时的目标 encoder，不决定取哪条录制。五条 capture 就消费五次请求；第六次返回 `409 recording_exhausted`。后台 Replay 操作会把 cursor 归零。
+进入 Replay 后，runtime 保存选中的 `replayRecordingId` 和进程内 generation cursor。任何受支持的 generation 请求到达时都会原子领取下一条 generation capture，选择过程不读取、不比较 method、path、body、model、prompt、`stream` 或 `stream_options`。入口只决定跨 generation 协议时的目标 encoder，不决定取哪条录制。五条 generation capture 就消费五次请求；第六次返回 `409 recording_exhausted`。后台 Replay 操作会把 cursor 归零。
+
+`GET /v1/models` 是 discovery side channel：它重复重放当前 recording 中最后一个成功的 models capture，没有时返回内置列表，永远不推进 generation cursor。否则模型选择器的一次后台刷新就会偷走第一条 generation 响应，并使后续调用提前耗尽。
 
 该 cursor 是 single-process 范围的共享状态：并发客户端也共享同一序列，但原子领取保证同一条不会被重复消费。首版不为每个 client 建立 session，也不增加数据库或分布式锁。
 
@@ -673,7 +675,7 @@ Markdown 在线路协议里仍是普通文本；编辑器用 `format: "markdown"
 顺序回放中，以下条件全部满足时使用 raw replay：
 
 1. capture 有可重放的 downstream response；完整的 gateway/upstream error response 也可重放；
-2. source protocol 与 target protocol 一致，或该 capture 是 `/v1/models` 等 raw-only 请求；
+2. source protocol 与 target protocol 一致；models capture 走独立 raw replay；
 3. response body 未被编辑或转换；
 4. capture 没有无法读取的截断或录制写入错误；
 5. status、end-to-end header values、trailers 和 recorded termination semantics 能在当前 HTTP runtime 重现。
@@ -724,7 +726,7 @@ X-Mock-Replay-Source: cap_...
 
 - 主 recording replay 不解析新请求；输出使用下一条 capture 已录制的 stream/non-stream 形态。
 - 同协议直接写出原 response body chunks；跨 generation 协议由 capture 的已录制响应解析为 scenario，再编译为请求入口对应协议。
-- `/v1/models` 等非 generation capture 只做 raw replay，不尝试语义转换。
+- `/v1/models` capture 只做独立 raw replay，不参与 generation queue，也不尝试语义转换；没有成功 capture 时返回内置模型列表。
 - Record mode 不解析后重写 `stream`，而是原样代理。
 - 只有旧 binding/built-in fallback 才宽松解析 body 来编译 scenario；无效 JSON 在该兼容路径返回协议对应的 `400`。
 
@@ -962,7 +964,7 @@ Varlet 偏 mobile-first，首版桌面布局使用固定 CSS grid，不增加 re
 Order | Method | Path | Status/Recording | Total delay
 ```
 
-Replay 时同一列表变成消费队列，显示 consumed / next / pending 以及 `position / total`。点击 Replay 会加载所选 recording 并把 cursor 归零；不再要求逐个绑定 capture。
+Replay 时同一列表只显示 generation 消费队列，展示 consumed / next / pending 以及 `position / total`；models 请求仍在录制实时列表和详情中，但不会占用队列位置。点击 Replay 会加载所选 recording 并把 cursor 归零；不再要求逐个绑定 capture。
 
 保存的 recordings 使用紧凑列表展示时间、协议、请求数和完成数。选择后在同一页面查看队列；点击某一请求才按需加载 request、parsed response 和折叠的 timing/raw detail。Import、Save as Scenario 和 Move to Trash 保留，download/restore/paged raw 后移。
 

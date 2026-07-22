@@ -17,7 +17,7 @@
 
 录制模式只把同协议原请求和原 key 透传给当前选中的 upstream，`GET /v1/models` 也跟随该上游透传。每次请求仍独立保存为经过凭据脱敏的 `.llmcap.jsonl`，额外标记所属录制和顺序；文件记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。
 
-停止后该次录制会自动装入重放。每个受支持的下游请求都会原子消费下一条响应，不匹配 method、path、body、model 或 prompt；五条录制只响应前五次请求，第六次返回 `recording_exhausted`，再次点击 Replay 会归零游标。同协议保留原始 bytes、chunk、headers、状态与延迟；从另一生成协议入口请求时，通过 scenario compiler 转换响应。没有装入录制时，内置样例和手工场景仍作为默认重放数据。
+停止后该次录制会自动装入重放。每个 generation 请求都会原子消费下一条 generation 响应，不匹配 method、path、body、model 或 prompt；五条生成录制只响应前五次调用，第六次返回 `recording_exhausted`，再次点击 Replay 会归零游标。模型发现不消费该游标：`GET /v1/models` 优先重放本次录制中最后一个成功的模型列表，没有时返回内置列表。同协议保留原始 bytes、chunk、headers、状态与延迟；从另一生成协议入口请求时，通过 scenario compiler 转换响应。没有装入录制时，内置样例和手工场景仍作为默认重放数据。
 
 ```bash
 npm install

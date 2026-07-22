@@ -456,7 +456,15 @@ describe('startServer integration', () => {
       .sort((left, right) => Number(left) - Number(right)))
 
     const replayRuntime = await updateMode(servers, 'replay')
-    expect(replayRuntime).toMatchObject({ replayRecordingId: recordingId, replayPosition: 0, replayTotal: 2 })
+    expect(replayRuntime).toMatchObject({ replayRecordingId: recordingId, replayPosition: 0, replayTotal: 1 })
+
+    const replayModels = await fetch(`${servers.apiUrl}/v1/models`)
+    expect(replayModels.status).toBe(200)
+    expect(await replayModels.json()).toEqual({ data: [{ id: 'claude-recorded' }] })
+    expect(await adminJson<RuntimeView>(servers, '/admin/api/runtime')).toMatchObject({
+      replayPosition: 0,
+      replayTotal: 1,
+    })
 
     const firstReplay = await fetch(`${servers.apiUrl}/v1/responses`, {
       method: 'POST',
@@ -468,19 +476,19 @@ describe('startServer integration', () => {
     expect(firstReplayBody).toMatchObject({ object: 'response' })
     expect(JSON.stringify(firstReplayBody)).toContain('from anthropic')
 
-    const secondReplay = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
+    const exhausted = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
       method: 'POST',
       body: 'not json',
     })
-    expect(secondReplay.status).toBe(200)
-    expect(await secondReplay.json()).toEqual({ data: [{ id: 'claude-recorded' }] })
-
-    const exhausted = await fetch(`${servers.apiUrl}/v1/messages`, { method: 'POST', body: 'anything' })
     expect(exhausted.status).toBe(409)
-    expect(await exhausted.json()).toMatchObject({ error: { type: 'recording_exhausted' } })
+    expect(await exhausted.json()).toMatchObject({ error: { code: 'recording_exhausted' } })
+
+    const replayModelsAgain = await fetch(`${servers.apiUrl}/v1/models`)
+    expect(replayModelsAgain.status).toBe(200)
+    expect(await replayModelsAgain.json()).toEqual({ data: [{ id: 'claude-recorded' }] })
     expect(await adminJson<RuntimeView>(servers, '/admin/api/runtime')).toMatchObject({
-      replayPosition: 2,
-      replayTotal: 2,
+      replayPosition: 1,
+      replayTotal: 1,
     })
   })
 
@@ -608,6 +616,11 @@ describe('startServer integration', () => {
       sourceId: capture.id,
     }))
     await updateMode(servers, 'replay', undefined, ['openai-chat', 'anthropic-messages'])
+
+    const fallbackModels = await fetch(`${servers.apiUrl}/v1/models`)
+    expect(fallbackModels.status).toBe(200)
+    expect(await fallbackModels.json()).toMatchObject({ object: 'list', data: expect.any(Array) })
+    expect(await adminJson<RuntimeView>(servers, '/admin/api/runtime')).toMatchObject({ replayPosition: 0 })
 
     const sameProtocol = await fetch(`${servers.apiUrl}/v1/chat/completions`, {
       method: 'POST',
