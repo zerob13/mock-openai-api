@@ -182,11 +182,10 @@ onMounted(async () => {
       <div class="heading-actions"><var-button outline :loading="loading" @click="load">Refresh</var-button></div>
     </header>
 
-    <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
+    <div v-if="error" class="message danger page-error" role="alert">{{ error }}</div>
 
     <article class="panel replay-mode-panel" :class="{ active: runtime.state.mode === 'replay' }">
       <div>
-        <span class="eyebrow">Replay mode</span>
         <h2>{{ runtime.state.mode === 'replay' ? 'Replay is serving active bindings' : 'Recording is currently active' }}</h2>
         <p>Built-in examples are regular replay scenarios and can be replaced by a capture or an edited scenario below.</p>
       </div>
@@ -228,7 +227,7 @@ onMounted(async () => {
 
       <div class="source-grid">
         <div class="source-column">
-          <span class="eyebrow">Source type</span>
+          <span class="section-label">Source type</span>
           <div class="segmented" role="radiogroup" aria-label="Replay source type">
             <label :class="{ active: form.sourceType === 'capture' }"><input v-model="form.sourceType" type="radio" value="capture" /> Raw capture</label>
             <label :class="{ active: form.sourceType === 'scenario' }"><input v-model="form.sourceType" type="radio" value="scenario" /> Scenario</label>
@@ -249,7 +248,7 @@ onMounted(async () => {
         </div>
 
         <div class="compatibility-column">
-          <span class="eyebrow">Compatibility</span>
+          <span class="section-label">Compatibility</span>
           <div v-if="exactReplay" class="compatibility-card exact-card">
             <strong>✓ Body Exact · {{ form.speed === 'instant' ? 'Instant' : 'Recorded Timing' }}</strong>
             <p>Response entity bytes are replayed unchanged. The request must use the recorded stream and include_usage options.</p>
@@ -269,7 +268,7 @@ onMounted(async () => {
 
       <footer class="endpoint-bar">
         <div>
-          <span class="eyebrow">Endpoint</span>
+          <span class="section-label">Endpoint</span>
           <code>{{ endpoint }}</code>
         </div>
         <div class="button-row">
@@ -303,8 +302,7 @@ onMounted(async () => {
 
 <style scoped>
 .page-error { margin-bottom: 16px; }
-.replay-mode-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; padding: 18px; border-left: 5px solid var(--warning); }
-.replay-mode-panel.active { background: color-mix(in srgb, var(--warning-soft) 38%, var(--surface)); }
+.replay-mode-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; padding: 18px; }
 .replay-mode-panel h2 { margin: 5px 0 4px; font-size: 17px; }
 .replay-mode-panel p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .binding-builder { overflow: hidden; }
@@ -312,26 +310,25 @@ onMounted(async () => {
 .source-grid { display: grid; grid-template-columns: 1.08fr .92fr; min-height: 320px; }
 .source-column, .compatibility-column { min-width: 0; padding: 20px; }
 .source-column { border-right: 1px solid var(--border); }
-.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 9px 0 14px; padding: 4px; border-radius: 9px; background: var(--surface-soft); }
-.segmented label { padding: 8px 10px; border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 650; text-align: center; cursor: pointer; }
-.segmented label.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 5px rgba(0,0,0,.08); }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 9px 0 14px; padding: 3px; border-radius: 4px; background: var(--surface-soft); }
+.segmented label { padding: 8px 10px; border-radius: 2px; color: var(--muted); font-size: 11px; font-weight: 650; text-align: center; cursor: pointer; }
+.segmented label.active { background: var(--surface); color: var(--text); }
 .segmented input { position: absolute; width: 1px; min-height: 1px; opacity: 0; }
 .source-list { display: grid; gap: 7px; max-height: 290px; overflow: auto; }
-.source-list label { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--border); border-radius: 9px; cursor: pointer; }
-.source-list label:hover, .source-list label.selected { border-color: var(--accent); background: var(--accent-soft); }
+.source-list label { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+.source-list label:hover, .source-list label.selected { border-color: var(--border-strong); background: var(--surface-soft); }
 .source-list input { width: 15px; min-height: 15px; accent-color: var(--accent); }
 .source-list strong, .source-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source-list strong { font-size: 12px; }
+/* deslop-ignore-next-line 33 -- Source IDs are machine identifiers. */
 .source-list small { margin-top: 3px; color: var(--muted); font-family: "SFMono-Regular", monospace; font-size: 9px; }
 .source-empty { min-height: 170px; }
 .compatibility-column { background: var(--surface-soft); }
-.compatibility-card { margin-top: 9px; padding: 17px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.compatibility-card { margin-top: 9px; padding: 17px 0 0; border-top: 1px solid var(--border); }
 .compatibility-card strong { font-size: 13px; }
 .compatibility-card p { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
-.exact-card { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
-.warning-card { border-color: color-mix(in srgb, var(--warning) 50%, var(--border)); }
 .diagnostics { margin: 15px 0 0; padding-left: 17px; color: var(--warning); font-size: 11px; line-height: 1.55; }
-.compatibility-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; color: var(--accent-strong); font-size: 11px; }
+.compatibility-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; color: var(--text); font-size: 11px; }
 .endpoint-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 18px; border-top: 1px solid var(--border); }
 .endpoint-bar code { display: block; margin-top: 5px; font-size: 11px; word-break: break-all; }
 .active-bindings { margin-top: 18px; }

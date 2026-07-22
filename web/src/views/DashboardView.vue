@@ -87,7 +87,7 @@ onMounted(load)
       </article>
     </div>
 
-    <div v-if="error" class="callout danger" role="alert">{{ error }}</div>
+    <div v-if="error" class="message danger" role="alert">{{ error }}</div>
 
     <div class="split-grid dashboard-grid">
       <article class="panel">

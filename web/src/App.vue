@@ -11,10 +11,10 @@ const dark = ref(localStorage.getItem('mock-console-theme') === 'dark' || (
 let refreshTimer: number | undefined
 
 const navigation = [
-  { to: '/recordings', label: 'Recorder', short: 'Record', icon: '●' },
-  { to: '/scenarios', label: 'Scenario Editor', short: 'Editor', icon: '✦' },
-  { to: '/test', label: 'API Test', short: 'Test', icon: '↗' },
-  { to: '/settings', label: 'Settings', short: 'Settings', icon: '⚙' },
+  { to: '/recordings', label: 'Recorder', short: 'Record' },
+  { to: '/scenarios', label: 'Scenario Editor', short: 'Editor' },
+  { to: '/test', label: 'API Test', short: 'Test' },
+  { to: '/settings', label: 'Settings', short: 'Settings' },
 ]
 
 const protocolLabels = {
@@ -51,7 +51,6 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
   <div class="app-shell">
     <header class="app-header">
       <router-link class="brand" to="/recordings" aria-label="Mock OpenAI API recorder">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>
           <strong>Mock OpenAI API</strong>
           <small>Record &amp; replay console</small>
@@ -66,8 +65,8 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
           <i aria-hidden="true"></i>
           {{ runtime.connected ? `API ${runtime.state.apiBaseUrl.replace(/^https?:\/\//, '')}` : 'Admin offline' }}
         </span>
-        <button class="icon-button" type="button" :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="toggleTheme">
-          {{ dark ? '☀' : '◐' }}
+        <button class="theme-button" type="button" :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="toggleTheme">
+          {{ dark ? 'Light' : 'Dark' }}
         </button>
       </div>
     </header>
@@ -80,7 +79,6 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer))
           :to="item.to"
           :aria-current="route.path === item.to ? 'page' : undefined"
         >
-          <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span>
           <span class="nav-label">{{ item.label }}</span>
           <span class="nav-short">{{ item.short }}</span>
         </router-link>

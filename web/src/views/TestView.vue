@@ -200,11 +200,11 @@ onMounted(() => {
       </div>
     </header>
 
-    <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
+    <div v-if="error" class="message danger page-error" role="alert">{{ error }}</div>
 
     <div class="test-layout">
       <article class="panel request-panel">
-        <header class="panel-header"><h2>Request</h2><span class="badge info">browser → API :3000</span></header>
+        <header class="panel-header"><h2>Request</h2><span class="panel-note">Browser to API :3000</span></header>
         <div class="panel-body request-form">
           <div class="request-presets">
             <label class="field"><span>Protocol</span><select v-model="protocol"><option value="openai-chat">OpenAI Chat</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
@@ -226,7 +226,7 @@ onMounted(() => {
           <h2>Response</h2>
           <div class="button-row">
             <span v-if="status != null" class="badge" :class="status < 400 ? 'success' : 'danger'">HTTP {{ status }}</span>
-            <span v-if="chunks.length" class="badge plain">{{ chunks.length }} chunks</span>
+            <span v-if="chunks.length" class="panel-note">{{ chunks.length }} chunks</span>
           </div>
         </header>
         <div v-if="sending && !chunks.length" class="loading-row"><var-loading size="small" /> Waiting for first byte</div>

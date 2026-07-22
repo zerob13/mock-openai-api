@@ -232,7 +232,7 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
       </div>
     </header>
 
-    <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
+    <div v-if="error" class="message danger page-error" role="alert">{{ error }}</div>
 
     <article class="panel recorder" :class="{ recording: runtime.state.mode === 'record' }">
       <button
@@ -247,7 +247,6 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
       </button>
 
       <div class="recorder-copy">
-        <span class="eyebrow">{{ runtime.state.mode === 'record' ? 'Recording' : 'Ready' }}</span>
         <h2>{{ runtime.state.mode === 'record' ? `${activeRecording?.requestCount || 0} requests captured` : 'New recording' }}</h2>
         <p v-if="runtime.state.mode === 'record'" class="mono">{{ endpoint }}</p>
         <p v-else>Each press starts a fresh ordered recording.</p>
@@ -380,12 +379,12 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
 .page-error { margin-bottom: 16px; }
 .recorder-page { width: min(1120px, 100%); }
 .recorder { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(260px, 340px); gap: 24px; align-items: center; padding: 24px; }
-.recorder.recording { border-color: color-mix(in srgb, var(--danger) 52%, var(--border)); background: color-mix(in srgb, var(--danger-soft) 30%, var(--surface)); }
-.record-button { display: grid; width: 78px; height: 78px; place-items: center; border: 4px solid var(--danger); border-radius: 50%; background: var(--surface); color: var(--danger); box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 13%, transparent); font-size: 31px; line-height: 1; }
-.record-button:hover { transform: scale(1.03); }
+.recorder.recording { border-color: var(--border-strong); }
+/* deslop-ignore-next-line 19 -- The circular control follows the physical record-button convention. */
+.record-button { display: grid; width: 72px; height: 72px; place-items: center; border: 2px solid var(--danger); border-radius: 50%; background: var(--surface); color: var(--danger); font-size: 28px; line-height: 1; }
 .record-button.stop { background: var(--danger); color: #fff; }
 .record-button.stop span { font-size: 21px; }
-.record-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.record-button:disabled { opacity: .45; cursor: not-allowed; }
 .recorder-copy h2 { margin: 5px 0 6px; font-size: 20px; letter-spacing: -.02em; }
 .recorder-copy p { margin: 0; color: var(--muted); font-size: 11px; }
 .source-field { align-self: stretch; justify-content: center; }
@@ -395,7 +394,7 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
 .queue-status { display: flex; align-items: center; gap: 10px; }
 .request-table { min-width: 620px; }
 .request-table tr.consumed { opacity: .55; }
-.request-table tr.next { background: var(--warning-soft); }
+.request-table tr.next { background: var(--surface-soft); font-weight: 650; }
 .request-index { width: 54px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .request-path { display: block; max-width: 640px; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .recording-list { display: grid; }

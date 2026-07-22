@@ -275,14 +275,14 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
         <p>Build a protocol-neutral response timeline, then compile it through the same server code used by replay.</p>
       </div>
       <div class="heading-actions">
-        <var-button outline @click="createScenario">New</var-button>
+        <var-button outline @click="createScenario">New scenario</var-button>
         <var-button text color="danger" :disabled="isBuiltin || !scenarios.some((item) => item.id === draft.id)" @click="removeScenario">Delete</var-button>
         <var-button :loading="saving" :disabled="isBuiltin || Boolean(validationErrors.length || headersError)" @click="save">Save scenario</var-button>
       </div>
     </header>
 
-    <div v-if="error" class="callout danger page-error" role="alert">{{ error }}</div>
-    <div v-if="validationErrors.length" class="callout warning validation-callout" role="status">
+    <div v-if="error" class="message danger page-error" role="alert">{{ error }}</div>
+    <div v-if="validationErrors.length" class="message warning validation-message" role="status">
       <strong>Draft needs attention:</strong> {{ validationErrors[0] }}<span v-if="validationErrors.length > 1"> (+{{ validationErrors.length - 1 }} more)</span>
     </div>
 
@@ -297,15 +297,15 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
           <div v-if="!scenarios.length" class="empty-state scenario-empty"><div><strong>No saved scenarios</strong>Start with the draft.</div></div>
         </div>
         <div class="palette">
-          <span class="eyebrow">Add response block</span>
+          <h3 class="palette-heading">Add response block</h3>
           <div class="palette-grid">
-            <button type="button" @click="add('text')"><b>T</b> Text</button>
-            <button type="button" @click="add('markdown')"><b>M↓</b> Markdown</button>
-            <button type="button" @click="add('tool')"><b>{ }</b> Tool call</button>
-            <button type="button" @click="add('usage')"><b>Σ</b> Usage</button>
-            <button type="button" @click="add('finish')"><b>■</b> Finish</button>
-            <button type="button" @click="add('error')"><b>!</b> Error</button>
-            <button type="button" @click="add('ping')"><b>·</b> Ping</button>
+            <button type="button" @click="add('text')">Text</button>
+            <button type="button" @click="add('markdown')">Markdown</button>
+            <button type="button" @click="add('tool')">Tool call</button>
+            <button type="button" @click="add('usage')">Usage</button>
+            <button type="button" @click="add('finish')">Finish</button>
+            <button type="button" @click="add('error')">Error</button>
+            <button type="button" @click="add('ping')">Ping</button>
           </div>
         </div>
       </aside>
@@ -328,7 +328,7 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
         </div>
 
         <div class="timeline-heading">
-          <div><span class="eyebrow">Timeline</span><strong>{{ draft.timeline.length }} events</strong></div>
+          <div><strong>Timeline</strong><span class="panel-note">{{ draft.timeline.length }} events</span></div>
           <span class="panel-note">Drag or use keyboard controls to reorder</span>
         </div>
         <ol class="timeline-list" aria-label="Scenario timeline">
@@ -352,7 +352,7 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
       </main>
 
       <aside class="panel properties-panel">
-        <header class="panel-header"><h2>Properties</h2><span v-if="selectedEvent" class="badge info">{{ selectedEvent.type }}</span></header>
+        <header class="panel-header"><h2>Properties</h2><code v-if="selectedEvent" class="panel-note">{{ selectedEvent.type }}</code></header>
         <div v-if="!selectedEvent" class="empty-state"><div><strong>No event selected</strong>Add or select a timeline event.</div></div>
         <div v-else class="properties-body">
           <label class="field"><span>Timestamp (µs)</span><input v-model.number="selectedEvent.atUs" type="number" min="0" step="1000" /></label>
@@ -365,7 +365,7 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
             <label class="field"><span>Text block ID</span><input v-model="selectedEvent.textId" class="mono" /></label>
             <label v-if="selectedEvent.type !== 'text.end'" class="field"><span>Format hint</span><select v-model="selectedEvent.format"><option value="plain">Plain text</option><option value="markdown">Markdown</option></select></label>
             <label v-if="selectedEvent.type === 'text.delta'" class="field"><span>Chunk text</span><textarea v-model="selectedEvent.delta" rows="7" placeholder="Exact delta text"></textarea></label>
-            <div v-if="selectedEvent.type === 'text.delta' && selectedEvent.format === 'markdown'" class="markdown-preview"><span class="eyebrow">Markdown source preview</span><pre>{{ selectedEvent.delta }}</pre></div>
+            <div v-if="selectedEvent.type === 'text.delta' && selectedEvent.format === 'markdown'" class="markdown-preview"><span class="section-label">Markdown source preview</span><pre>{{ selectedEvent.delta }}</pre></div>
           </template>
           <template v-else-if="selectedEvent.type.startsWith('tool.')">
             <label class="field"><span>Tool call ID</span><input v-model="selectedEvent.toolCallId" class="mono" /></label>
@@ -384,7 +384,7 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
             <label class="field"><span>Error code</span><input v-model="selectedEvent.code" class="mono" /></label>
             <label class="field"><span>Message</span><textarea v-model="selectedEvent.message" rows="5"></textarea></label>
           </template>
-          <p v-else-if="selectedEvent.type === 'ping'" class="callout">Ping has no payload. Its timestamp controls when the keep-alive event is emitted.</p>
+          <p v-else-if="selectedEvent.type === 'ping'" class="field-help ping-note">Ping has no payload. Its timestamp controls when the keep-alive event is emitted.</p>
 
           <div class="event-actions">
             <var-button size="small" outline :disabled="selectedIndex === 0" @click="move(selectedIndex, selectedIndex - 1)">Move up</var-button>
@@ -412,43 +412,47 @@ onMounted(() => loadList(typeof route.query.id === 'string' ? route.query.id : u
 
 <style scoped>
 .dirty-mark { color: var(--warning); font-size: 10px; vertical-align: middle; }
-.page-error, .validation-callout { margin-bottom: 12px; }
+.page-error, .validation-message { margin-bottom: 12px; }
 .editor-layout { display: grid; grid-template-columns: 220px minmax(430px, 1fr) 300px; gap: 14px; align-items: start; }
 .editor-sidebar, .properties-panel { position: sticky; top: 102px; max-height: calc(100vh - 150px); overflow: auto; }
 .scenario-list { display: grid; gap: 4px; max-height: 220px; overflow: auto; padding: 8px; }
-.scenario-list button { min-width: 0; padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; }
+.scenario-list button { min-width: 0; padding: 10px; border: 1px solid transparent; border-radius: 4px; background: transparent; text-align: left; }
 .scenario-list button:hover, .scenario-list button.active { border-color: var(--border); background: var(--surface-soft); }
 .scenario-list strong, .scenario-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scenario-list strong { font-size: 11px; }
+/* deslop-ignore-next-line 33 -- Scenario IDs are machine identifiers. */
 .scenario-list small { margin-top: 4px; color: var(--muted); font-family: "SFMono-Regular", monospace; font-size: 9px; }
 .scenario-empty { min-height: 110px; padding: 12px; font-size: 11px; }
 .palette { padding: 14px; border-top: 1px solid var(--border); }
+.palette-heading { margin: 0; font-size: 12px; }
 .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
-.palette-grid button { min-height: 48px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 10px; text-align: left; }
-.palette-grid button:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
-.palette-grid b { display: block; margin-bottom: 3px; color: var(--accent-strong); font-size: 12px; }
+.palette-grid button { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--muted); font-size: 11px; text-align: left; }
+.palette-grid button:hover { border-color: var(--border-strong); background: var(--surface-soft); color: var(--text); }
 .scenario-meta-header { display: block; }
 .scenario-title-fields { display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; width: 100%; }
 .meta-grid { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.protocol-checks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; }
+.protocol-checks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 9px 11px; border: 1px solid var(--border); border-radius: 4px; }
 .protocol-checks legend { padding: 0 4px; color: var(--muted); font-size: 10px; font-weight: 650; }
 .protocol-checks label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10px; }
 .protocol-checks input { width: 14px; min-height: 14px; accent-color: var(--accent); }
 .stream-check { align-self: end; }
 .timeline-heading { display: flex; align-items: flex-end; justify-content: space-between; padding: 16px; }
-.timeline-heading strong { display: block; margin-top: 4px; font-size: 13px; }
+.timeline-heading strong { display: inline; margin-right: 8px; font-size: 13px; }
 .timeline-list { display: grid; gap: 5px; margin: 0; padding: 0 12px 16px; list-style: none; }
-.timeline-list li { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-.timeline-list li:hover, .timeline-list li.selected { border-color: var(--accent); background: var(--accent-soft); }
+.timeline-list li { border: 1px solid var(--border); border-radius: 4px; background: var(--surface); }
+.timeline-list li:hover, .timeline-list li.selected { border-color: var(--border-strong); background: var(--surface-soft); }
 .timeline-list li button { display: grid; width: 100%; min-height: 43px; grid-template-columns: 18px 67px 135px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 10px; border: 0; background: transparent; color: inherit; text-align: left; }
 .timeline-handle { color: var(--faint); cursor: grab; }
+/* deslop-ignore-next-line 33 -- Timeline offsets are machine timing data. */
 .timeline-list time { color: var(--muted); font-family: "SFMono-Regular", monospace; font-size: 9px; }
+/* deslop-ignore-next-line 33 -- Event types are protocol identifiers. */
 .event-type { font-family: "SFMono-Regular", monospace; font-size: 10px; font-weight: 700; }
 .event-value { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .properties-body { display: grid; gap: 13px; padding: 15px; }
+.ping-note { margin: 0; }
 .event-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px; border-top: 1px solid var(--border); }
 .markdown-preview { display: grid; gap: 6px; }
-.markdown-preview pre { min-height: 60px; margin: 0; padding: 10px; border-radius: 7px; background: var(--surface-soft); white-space: pre-wrap; }
+.markdown-preview pre { min-height: 60px; margin: 0; padding: 10px; border-radius: 4px; background: var(--surface-soft); white-space: pre-wrap; }
 .preview-panel { margin-top: 14px; }
 .preview-header > div:first-child h2 { margin-bottom: 4px; }
 .preview-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; padding: 16px; }

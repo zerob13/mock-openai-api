@@ -91,8 +91,8 @@ onMounted(async () => {
     </header>
 
     <div v-if="!initialized" class="loading-row"><var-loading size="small" /> Loading runtime settings</div>
-    <div v-if="error" class="callout danger page-message" role="alert">{{ error }}</div>
-    <div v-else-if="success" class="callout page-message" role="status">{{ success }}</div>
+    <div v-if="error" class="message danger page-message" role="alert">{{ error }}</div>
+    <div v-else-if="success" class="message success page-message" role="status">{{ success }}</div>
 
     <article v-show="initialized" class="panel settings-section">
       <header class="panel-header">
@@ -102,7 +102,7 @@ onMounted(async () => {
         <section v-for="(upstream, index) in upstreams" :key="upstream.protocol" class="upstream-card">
           <header>
             <div>
-              <span class="eyebrow">{{ upstream.protocol }}</span>
+              <code class="protocol-id">{{ upstream.protocol }}</code>
               <h3>{{ protocols[index].label }}</h3>
             </div>
             <span class="badge" :class="upstream.status === 'ready' ? 'success' : upstream.status === 'error' ? 'danger' : 'plain'">{{ upstream.status || 'unchecked' }}</span>
@@ -112,7 +112,7 @@ onMounted(async () => {
             <input v-model.trim="upstream.baseUrl" type="url" :placeholder="protocols[index].placeholder" spellcheck="false" />
             <small class="field-help">The gateway appends the protocol endpoint path exactly once.</small>
           </label>
-          <div class="callout">Client authentication headers pass through unchanged and are redacted only in the capture copy.</div>
+          <p class="field-help auth-note">Client authentication headers pass through unchanged and are redacted only in the capture copy.</p>
           <label class="check-row"><input v-model="upstream.allowPrivateNetwork" type="checkbox" /> Allow private-network target</label>
           <p v-if="upstream.message" class="check-message">{{ upstream.message }}</p>
           <div class="button-row">
@@ -123,7 +123,7 @@ onMounted(async () => {
     </article>
 
     <article v-show="initialized" class="panel settings-section">
-      <header class="panel-header"><h2>Runtime &amp; storage</h2><span class="badge info">rev {{ runtime.state.revision }}</span></header>
+      <header class="panel-header"><h2>Runtime &amp; storage</h2><span class="panel-note">Revision {{ runtime.state.revision }}</span></header>
       <div class="panel-body settings-form runtime-settings">
         <label class="field"><span>Data directory</span><input :value="runtime.state.dataDir" class="mono" disabled /><small class="field-help">Set at process startup. The web console cannot browse arbitrary server paths.</small></label>
         <fieldset class="endpoint-options">
@@ -144,10 +144,12 @@ onMounted(async () => {
 .upstream-card:last-child { border-right: 0; }
 .upstream-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .upstream-card h3 { margin: 5px 0 0; font-size: 13px; }
+.protocol-id { color: var(--muted); font-size: 10px; }
 .check-message { margin: -4px 0 0; color: var(--muted); font-size: 10px; }
+.auth-note { margin: 0; }
 .settings-form { display: grid; gap: 15px; }
 .runtime-settings { grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr); align-items: start; }
-.endpoint-options { display: grid; gap: 9px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 9px; }
+.endpoint-options { display: grid; gap: 9px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 4px; }
 .endpoint-options legend { padding: 0 4px; color: var(--muted); font-size: 10px; font-weight: 650; }
 .endpoint-options label { display: flex; align-items: center; gap: 7px; font-size: 11px; }
 .endpoint-options input { width: 15px; min-height: 15px; accent-color: var(--accent); }
