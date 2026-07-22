@@ -1,6 +1,5 @@
-import { MockModel, MockTestCase } from '../types';
-import { mockModels } from '../data/mockData';
-import { getMappedModelName, getOriginalModelName } from '../config/modelMapping';
+import { MockModel, MockTestCase } from '../types/index.js';
+import { mockModels } from '../data/mockData.js';
 
 /**
  * Generate unique chat completion ID
@@ -27,22 +26,7 @@ export function getCurrentTimestamp(): number {
  * Find model by ID
  */
 export function findModelById(modelId: string): MockModel | undefined {
-  // First check if it's a direct match with original model ID
-  let foundModel = mockModels.find(model => model.id === modelId);
-
-  if (foundModel) {
-    return foundModel;
-  }
-
-  // If not found, check if it's a mapped model name, get the original ID
-  const originalModelId = getOriginalModelName(modelId);
-  if (originalModelId) {
-    return mockModels.find(model => model.id === originalModelId);
-  }
-
-  // Finally, try mapping the input and finding the model
-  const mappedModelId = getMappedModelName(modelId);
-  return mockModels.find(model => model.id === mappedModelId);
+  return mockModels.find(model => model.id === modelId);
 }
 
 /**
@@ -54,7 +38,6 @@ export function selectTestCase(model: MockModel, userPrompt: string): MockTestCa
   // For markdown model, always return the first test case (the complete markdown example)
   if (model.type === 'markdown') {
     const idx = Math.floor(getCurrentTimestamp() % model.testCases.length)
-    console.log('markdown model', idx);
     return model.testCases[idx];
   }
 

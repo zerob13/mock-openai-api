@@ -1,6 +1,8 @@
 # Mock OpenAI API
 
 [![NPM Version](https://img.shields.io/npm/v/mock-openai-api)](https://www.npmjs.com/package/mock-openai-api)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zerob13/mock-openai-api)](https://hub.docker.com/r/zerob13/mock-openai-api)
+[![GitHub Release](https://img.shields.io/github/v/release/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/releases)
 [![GitHub License](https://img.shields.io/github/license/zerob13/mock-openai-api)](https://github.com/zerob13/mock-openai-api/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-404D59?style=flat&logo=express&logoColor=white)](https://expressjs.com/)
@@ -9,33 +11,56 @@
 
 *中文说明 | [English](README.md)*
 
-一个完整的 OpenAI、Anthropic、Gemini API 兼容模拟服务器，无需调用真实的大模型，返回确定性的本地测试数据。非常适合开发、测试和调试使用多家 AI API 的应用程序。
+一个面向 OpenAI 与 Anthropic 常用协议的模拟服务器；重放模式无需调用真实模型，可返回内置或已录制的测试数据。
+
+## 录制与重放后台
+
+启动后会同时提供 Mock API `http://127.0.0.1:3000` 和管理后台 `http://127.0.0.1:3001`。Recorder 是主界面：选择任意一个已配置的 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 上游，按下录制，发送任意数量的请求，再按停止。每个完成中或已完成的请求都会实时显示为一行。
+
+录制模式只把同协议原请求和原 key 透传给当前选中的 upstream，`GET /v1/models` 也跟随该上游透传。每次请求仍独立保存为经过凭据脱敏的 `.llmcap.jsonl`，额外标记所属录制和顺序；文件记录请求、响应、原始 SSE read chunk、状态、headers 和相对时间。
+
+停止后该次录制会自动装入重放。每个 generation 请求都会原子消费下一条 generation 响应，不匹配 method、path、body、model 或 prompt；五条生成录制只响应前五次调用，第六次返回 `recording_exhausted`，再次点击 Replay 会归零游标。模型发现不消费该游标：`GET /v1/models` 优先重放本次录制中最后一个成功的模型列表，没有时返回内置列表。同协议保留原始 bytes、chunk、headers、状态与延迟；从另一生成协议入口请求时，通过 scenario compiler 转换响应。没有装入录制时，内置样例和手工场景仍作为默认重放数据。
+
+![包含五条请求重放列表的 Web 管理后台](docs/images/admin-recorder.png)
+
+内置 Web 管理后台提供：
+
+- **Recorder**：开始和停止有序录制，查看脱敏后的请求与响应，导入 capture，并把 capture 移入回收目录。
+- **Replay playlist**：把完整 recording 或单条请求拖入队列并重排，支持顺序、随机、单条循环和列表循环。
+- **Scenario Editor**：编辑 text、tool call、usage、finish、error 与 ping 时间线，并预览为 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 输出。
+- **API Test**：发送流式或非流式请求，查看原始响应、headers、SSE event 与浏览器 chunk 时间线，并生成 curl 或 SDK 示例。
+- **Settings**：分别配置三种协议的 upstream，手动检查连通性，按需允许私网目标，并启用或禁用网关入口。
+
+Web 管理后台同时包含在 npm 包和 Docker 镜像中，支持桌面、移动端以及明暗主题。Admin 默认只监听 loopback；对外暴露时必须设置仅保存在内存中的 bearer token。
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+支持 `POST /v1/chat/completions`、`POST /v1/responses`、`POST /v1/messages` 和 `GET /v1/models`。客户端只需保持 API key 不变，把 base URL 指向本服务。完整架构、文件格式、协议映射和安全边界见 [`docs/record-replay-implementation.md`](docs/record-replay-implementation.md)。
 
 ## 🚀 快速开始
 
-### 方法 1：公共服务（无需安装配置）
-
-最快的使用方式是直接使用我们的公共部署服务：
-
-**服务地址**: `https://mockllm.anya2a.com/v1`  
-**API密钥**: `DeepChat`
+### 方法 1：Docker
 
 ```bash
-# 测试公共服务
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
+docker run -p 3000:3000 zerob13/mock-openai-api:1.0.6
 
-# 聊天完成示例
-curl -X POST https://mockllm.anya2a.com/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer DeepChat" \
-  -d '{
-    "model": "mock-gpt-thinking",
-    "messages": [{"role": "user", "content": "你好"}]
-  }'
+# 安全暴露管理后台
+docker run -p 3000:3000 -p 127.0.0.1:3001:3001 \
+  -e ADMIN_HOST=0.0.0.0 -e ADMIN_TOKEN=change-this-token \
+  -v mock-openai-data:/data zerob13/mock-openai-api:1.0.6
 ```
 
-### 方法 2：NPM 安装（本地部署）
+### 方法 2：Docker Compose
+
+```bash
+ADMIN_TOKEN=change-this-token docker compose up -d
+```
+
+### 方法 3：NPM 安装（本地部署）
 
 ```bash
 npm install -g mock-openai-api
@@ -47,7 +72,7 @@ npm install -g mock-openai-api
 npx mock-openai-api
 ```
 
-服务器将在 `http://localhost:3000` 启动。
+Mock API 会在 `http://localhost:3000` 启动，Web 管理后台会在 `http://127.0.0.1:3001` 启动。
 
 ## ⚙️ CLI 选项
 
@@ -78,6 +103,10 @@ npx mock-openai-api -p 8080 -H 127.0.0.1 -v
 | ------------------ | ---- | ------------------------ | --------- |
 | `--port <number>`  | `-p` | 服务器端口               | `3000`    |
 | `--host <address>` | `-H` | 服务器主机地址           | `0.0.0.0` |
+| `--admin-port <number>` |      | 管理后台端口         | `3001`    |
+| `--admin-host <address>` |     | 管理后台监听地址     | `127.0.0.1` |
+| `--admin-token <token>` |      | 管理后台 Bearer token；非 loopback 监听时必填 |  |
+| `--data-dir <path>` | `-d` | 录制与场景目录           | `.mock-openai-api` |
 | `--verbose`        | `-v` | 启用请求日志输出到控制台 | `false`   |
 | `--version`        |      | 显示版本号               |           |
 | `--help`           |      | 显示帮助信息             |           |
@@ -101,29 +130,12 @@ npx mock-openai-api --version
 npx mock-openai-api --help
 ```
 
-服务器启动时，会显示正在使用的配置：
+服务器启动时会输出两个 listener 与数据目录：
 
 ```
-🚀 Mock OpenAI API server started successfully!
-📍 Server address: http://0.0.0.0:3000
-⚙️  Configuration:
-   • Port: 3000
-   • Host: 0.0.0.0
-   • Verbose logging: DISABLED
-   • Config file: ./model-mapping.json
-   • Version: 1.0.6
-📖 API Documentation:
-   OpenAI compatible:
-   • POST /v1/responses - Responses API 创建/流式/tool calls
-   • POST /v1/chat/completions - Chat Completions 创建/流式/tool calls
-   • POST /v1/embeddings - 确定性 embeddings
-   • POST /v1/files - 上传模拟文件
-   Anthropic compatible:
-   • POST /v1/messages - Messages 创建/流式/tool use/thinking
-   • POST /v1/messages/count_tokens - Message token 统计
-   Gemini compatible:
-   • POST /v1beta/models/{model}:generateContent - GenerateContent
-   • POST /upload/v1beta/files - 文件上传，兼容 SDK resumable upload
+Mock API: http://127.0.0.1:3000
+Admin UI: http://127.0.0.1:3001
+Data: /path/to/.mock-openai-api
 ```
 
 ### 基本使用
@@ -131,14 +143,6 @@ npx mock-openai-api --help
 ```bash
 # 获取模型列表
 curl http://localhost:3000/v1/models
-
-# Responses API
-curl -X POST http://localhost:3000/v1/responses \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4.1-mini",
-    "input": "本地 agent harness 测试"
-  }'
 
 # 聊天完成（非流式）
 curl -X POST http://localhost:3000/v1/chat/completions \
@@ -170,73 +174,29 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ## 🎯 特性
 
-- ✅ **完整的 OpenAI API 兼容性**
-- ✅ **支持 Anthropic Claude API**
-- ✅ **支持 Google Gemini API**
+- ✅ **兼容 OpenAI Chat、OpenAI Responses 与 Anthropic Messages 网关入口**
 - ✅ **支持流式和非流式聊天完成**
 - ✅ **支持函数调用**
 - ✅ **支持图像生成**
 - ✅ **预定义的测试场景**
+- ✅ **内置录制、重放列表、场景编辑与 API 测试 Web 管理后台**
 - ✅ **TypeScript 编写**
 - ✅ **易于集成和部署**
 - ✅ **详细的错误处理**
 
 ## 📋 支持的 API 端点
 
-### OpenAI 兼容端点
-- `GET /v1/models` - 默认获取 OpenAI 兼容模型列表
+### 模型管理
+- `GET /v1/models` - 获取可用模型列表
 - `GET /models` - 兼容端点
-- `POST /v1/responses` - 创建确定性的 Responses API 响应
-- `GET /v1/responses/{response_id}` - 获取已存储的响应
-- `DELETE /v1/responses/{response_id}` - 删除已存储的响应
-- `POST /v1/responses/{response_id}/cancel` - 取消排队/进行中的响应
-- `GET /v1/responses/{response_id}/input_items` - 列出响应输入项
-- `POST /v1/responses/input_tokens` - 统计响应输入 token
-- `POST /v1/responses/compact` - 返回确定性的上下文压缩响应
+
+### 聊天完成
 - `POST /v1/chat/completions` - 创建聊天完成
-- `GET /v1/chat/completions/{completion_id}` - 获取已存储的聊天完成
-- `POST /v1/chat/completions/{completion_id}` - 更新聊天完成 metadata
-- `DELETE /v1/chat/completions/{completion_id}` - 删除已存储的聊天完成
-- `GET /v1/chat/completions/{completion_id}/messages` - 列出聊天消息
 - `POST /chat/completions` - 兼容端点
+
+### 图像生成
 - `POST /v1/images/generations` - 生成图像
-- `POST /v1/images/edits` - 生成确定性的图像编辑结果
-- `POST /v1/images/variations` - 生成确定性的图像变体结果
 - `POST /images/generations` - 兼容端点
-- `POST /v1/embeddings` - 创建确定性的 embedding 向量
-- `POST /v1/files` - 上传模拟文件
-- `GET /v1/files` - 列出模拟文件
-- `GET /v1/files/{file_id}` - 获取模拟文件 metadata
-- `DELETE /v1/files/{file_id}` - 删除模拟文件
-
-### Anthropic 兼容端点
-- `GET /v1/models` - 设置 `anthropic-version` 或 `x-provider: anthropic` 时返回 Anthropic 模型列表
-- `GET /anthropic/v1/models` - 获取 Anthropic 模型列表
-- `POST /v1/messages` - 创建 Claude 兼容消息
-- `POST /anthropic/v1/messages` - 兼容消息端点
-- `POST /v1/messages/count_tokens` - 统计 Claude 兼容消息 token
-- `POST /v1/files` - 设置 Anthropic provider header 时上传 Anthropic 形状的模拟文件
-- `GET /v1/files` - 设置 Anthropic provider header 时列出 Anthropic 形状的模拟文件
-- `GET /v1/files/{file_id}` - 设置 Anthropic provider header 时获取文件 metadata
-- `DELETE /v1/files/{file_id}` - 设置 Anthropic provider header 时删除文件
-
-### Gemini 兼容端点
-- `GET /v1/models` - 设置 `x-provider: gemini` 或 `?provider=gemini` 时返回 Gemini 模型列表
-- `GET /v1beta/models` - 获取 Gemini 模型列表
-- `POST /v1beta/models/{model}:generateContent` - 生成内容
-- `POST /v1beta/models/{model}:streamGenerateContent` - 流式生成内容
-- `POST /v1beta/models/{model}:countTokens` - 统计 Gemini 请求 token
-- `POST /upload/v1beta/files` - 上传 Gemini 模拟文件
-- `GET /v1beta/files` - 列出 Gemini 模拟文件
-- `GET /v1beta/files/{name}` - 获取 Gemini 文件 metadata
-- `DELETE /v1beta/files/{name}` - 删除 Gemini 模拟文件
-- `POST /v1beta/cachedContents` - 创建 Gemini cached content
-- `GET /v1beta/cachedContents` - 列出 Gemini cached contents
-- `GET /v1beta/cachedContents/{name}` - 获取 Gemini cached content metadata
-- `DELETE /v1beta/cachedContents/{name}` - 删除 Gemini cached content
-- `GET /gemini/v1/models` - 旧版 Gemini 模型别名
-- `POST /gemini/v1/models/{model}/generateContent` - 旧版 Gemini 生成别名
-- `POST /gemini/v1/models/{model}/streamGenerateContent` - 旧版 Gemini 流式别名
 
 ### 健康检查
 - `GET /health` - 服务器健康状态
@@ -332,147 +292,70 @@ npm start
 
 ```
 src/
-├── core/           # 确定性场景、错误、状态、SSE、usage、校验
-├── providers/      # OpenAI、Anthropic、Gemini 协议路由和服务
-├── fixtures/       # provider fixture 示例
-├── data/           # 旧版预定义测试数据
-├── controllers/    # 旧版兼容 controller
-├── routes/         # 路由注册
+├── types/          # TypeScript 类型定义
+├── data/           # 预定义的测试数据
+├── utils/          # 工具函数
+├── services/       # 业务逻辑服务
+├── controllers/    # 路由控制器
+├── routes/         # 路由定义
 ├── app.ts          # Express 应用设置
 ├── index.ts        # 服务器启动
 └── cli.ts          # CLI 工具入口
-
-test/
-├── contract/       # 离线端点契约测试
-├── unit/           # 核心确定性基础设施测试
-└── sdk/            # 通过 RUN_SDK_TESTS=1 开启的 SDK smoke tests
 ```
 
-### Mock 控制项与场景速查
+### 添加新的测试场景
 
-默认响应都是确定性的，也可以用 mock 控制项指定场景：
+1. 在 `src/data/mockData.ts` 中添加新的测试用例
+2. 可以为现有模型添加测试用例，或创建新的模型类型
+3. 重新构建项目：`npm run build`
 
-| 控制项 | 位置 | 说明 |
-| --- | --- | --- |
-| `x-mock-scenario` / `mock_scenario` | header、query 或 JSON body | 强制场景，例如 `tool_call`、`parallel_tools`、`structured_json`、`refusal`、`rate_limit`、`invalid_request`。 |
-| `x-mock-seed` | header | 固定生成 ID，便于重复测试。 |
-| `x-mock-latency-ms` / `mock_latency_ms` | header、query 或 JSON body | 在 handler 执行前添加端点延迟，最大 30000 ms。 |
-| `x-mock-stream-chunk-ms` / `mock_stream_chunk_ms` | header、query 或 JSON body | 为 provider SSE 帧之间添加延迟，用于测试流式客户端，最大 30000 ms。 |
-| `x-mock-error` / `mock_error` | header 或 query | 注入 provider 形状的 `400`、`401`、`403`、`404`、`409`、`429`、`500`、`529` 错误。 |
-| `x-mock-background` | header | 在支持的 OpenAI Responses 路由中创建 queued/background 响应。 |
+示例：
 
-常用场景：
-
-```bash
-# OpenAI Responses tool call
-curl -X POST http://localhost:3000/v1/responses \
-  -H "Content-Type: application/json" \
-  -H "x-mock-scenario: tool_call" \
-  -d '{"model":"gpt-4.1-mini","input":"查询订单 A100","tools":[{"type":"function","name":"get_order"}]}'
-
-# Anthropic parallel tool use
-curl -X POST http://localhost:3000/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-mock-scenario: parallel_tools" \
-  -d '{"model":"claude-sonnet-4-5","max_tokens":256,"messages":[{"role":"user","content":"查询订单和天气"}],"tools":[{"name":"get_order","input_schema":{"type":"object"}},{"name":"get_weather","input_schema":{"type":"object"}}]}'
-
-# Gemini structured JSON
-curl -X POST http://localhost:3000/v1beta/models/gemini-1.5-flash:generateContent \
-  -H "Content-Type: application/json" \
-  -d '{"contents":[{"role":"user","parts":[{"text":"提取商品数据"}]}],"generationConfig":{"responseMimeType":"application/json","responseSchema":{"type":"OBJECT"}}}'
-
-# 延迟流式分块
-curl -N -X POST http://localhost:3000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "x-mock-stream-chunk-ms: 100" \
-  -d '{"model":"gpt-4.1-mini","stream":true,"messages":[{"role":"user","content":"慢速流式输出"}]}'
+```typescript
+const newTestCase: MockTestCase = {
+  name: "新功能测试",
+  description: "测试新功能的描述",
+  prompt: "触发关键词",
+  response: "预期的响应内容",
+  streamChunks: ["分段", "流式", "内容"], // 可选
+  functionCall: { // 可选，仅用于 function 类型模型
+    name: "function_name",
+    arguments: { param: "value" }
+  }
+};
 ```
-
-### Fixture 贡献
-
-Fixture 示例位于：
-
-```txt
-src/fixtures/openai/
-src/fixtures/anthropic/
-src/fixtures/gemini/
-```
-
-新增 fixture 时请保持离线、确定性：不要复制真实线上 provider payload，不做真实 API 调用，ID/时间戳要稳定，并为新增场景补充对应 contract 或 unit test。当前运行时响应主要由 provider service 生成，fixture 文件用于贡献示例和后续 fixture-store 扩展。
-
-### 迁移说明
-
-旧版端点会继续保留：`/models`、`/chat/completions`、`/images/generations`、`/anthropic/v1/models`、`/anthropic/v1/messages`、以及 `/gemini/v1/...` 别名仍然可用；新的 `/v1/...` 和 `/v1beta/...` provider 兼容端点会继续扩展。
 
 ## 🌐 部署
 
 ### Docker 部署
 
-创建 `Dockerfile`:
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
-```
-
-构建和运行：
+仓库内置多阶段 `Dockerfile` 和带持久化卷的 Compose 配置。默认容器只对外提供 Mock API；若暴露管理后台，必须设置仅保存在内存中的 token：
 
 ```bash
 docker build -t mock-openai-api .
 docker run -p 3000:3000 mock-openai-api
+
+docker run -p 3000:3000 -p 127.0.0.1:3001:3001 \
+  -e ADMIN_HOST=0.0.0.0 -e ADMIN_TOKEN=change-this-token \
+  -v mock-openai-data:/data mock-openai-api
+
+ADMIN_TOKEN=change-this-token docker compose up -d
 ```
 
 ### 环境变量
 
 - `PORT` - 服务器端口（默认：3000）
 - `HOST` - 服务器主机（默认：0.0.0.0）
-- `MODEL_MAPPING_CONFIG` - 模型映射配置文件路径（默认：model-mapping.json）
-
-### 模型映射配置
-
-您可以通过创建 `model-mapping.json` 文件来自定义显示给用户的模型名称。这允许您将内部模型名称映射到外部名称，以提供更好的用户体验。
-
-**示例 model-mapping.json:**
-```json
-{
-  "mock-gpt-thinking": "gpt-4o-mini",
-  "gpt-4-mock": "gpt-4-turbo",
-  "mock-gpt-markdown": "gpt-4o",
-  "gpt-4o-image": "dall-e-3",
-  "mock-claude-markdown": "claude-3-opus-20240229",
-  "gemini-1.5-pro": "gemini-2.0-pro-exp-2025-01-15",
-  "gemini-1.5-flash": "gemini-2.0-flash-exp-2025-01-15",
-  "gemini-pro": "gemini-pro-1.0",
-  "gemini-pro-vision": "gemini-pro-vision-1.0"
-}
-```
-
-**CLI 使用:**
-```bash
-# 使用自定义模型映射配置
-npx mock-openai-api -c custom-mapping.json
-
-# 或通过环境变量设置
-MODEL_MAPPING_CONFIG=custom-mapping.json npx mock-openai-api
-```
-
-服务器将自动加载配置并在控制台输出和 API 响应中显示映射后的模型名称。
+- `ADMIN_PORT` - 管理后台端口（默认：3001）
+- `ADMIN_HOST` - 管理后台监听地址（默认：127.0.0.1）
+- `ADMIN_TOKEN` - 管理后台 Bearer token；非 loopback 监听时必填且不会持久化
+- `DATA_DIR` - 录制与场景持久化目录（默认：`.mock-openai-api`）
 
 ## 🧪 测试
 
 ### 使用 curl 测试
 
 ```bash
-# 测试公共服务
-curl https://mockllm.anya2a.com/health
-curl https://mockllm.anya2a.com/v1/models \
-  -H "Authorization: Bearer DeepChat"
-
 # 测试本地服务
 curl http://localhost:3000/health
 curl http://localhost:3000/v1/models
@@ -523,24 +406,11 @@ curl -X POST http://localhost:3000/v1/images/generations \
 
 ### 使用 OpenAI SDK 测试
 
-本地 SDK smoke tests 默认跳过，只有显式开启时才运行：
-
-```bash
-npm test
-RUN_SDK_TESTS=1 npm test -- test/sdk
-```
-
 ```javascript
 import OpenAI from 'openai';
 
-// 使用公共服务
+// 使用本地部署
 const client = new OpenAI({
-  baseURL: 'https://mockllm.anya2a.com/v1',
-  apiKey: 'DeepChat'
-});
-
-// 或使用本地部署
-const localClient = new OpenAI({
   baseURL: 'http://localhost:3000/v1',
   apiKey: 'mock-key' // 可以是任意值
 });
@@ -574,54 +444,6 @@ const image = await client.images.generate({
 });
 
 console.log(image.data[0].url);
-```
-
-### 使用 Anthropic SDK 测试
-
-```javascript
-import Anthropic from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic({
-  baseURL: 'http://localhost:3000',
-  apiKey: 'mock-key'
-});
-
-const message = await anthropic.messages.create({
-  model: 'claude-sonnet-4-5',
-  max_tokens: 256,
-  messages: [{ role: 'user', content: '你好' }],
-  tools: [{ name: 'get_order', input_schema: { type: 'object' } }]
-});
-
-console.log(message.content);
-```
-
-### 使用 Google GenAI SDK 测试
-
-```javascript
-import { GoogleGenAI } from '@google/genai';
-
-const ai = new GoogleGenAI({
-  apiKey: 'mock-key',
-  httpOptions: {
-    baseUrl: 'http://localhost:3000',
-    apiVersion: 'v1beta'
-  }
-});
-
-const response = await ai.models.generateContent({
-  model: 'gemini-1.5-flash',
-  contents: '你好'
-});
-
-console.log(response.text);
-
-const file = await ai.files.upload({
-  file: new Blob(['mock file'], { type: 'text/plain' }),
-  config: { mimeType: 'text/plain', displayName: 'mock.txt' }
-});
-
-console.log(file.uri);
 ```
 
 ## 🤝 贡献

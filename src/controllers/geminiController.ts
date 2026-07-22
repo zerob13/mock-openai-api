@@ -1,84 +1,54 @@
+
 import { Request, Response } from 'express';
-import { 
-  getGeminiModels, 
-  generateContent, 
-  streamGenerateContent 
-} from '../services/geminiService';
-import { GeminiGenerateContentRequest } from '../types/gemini';
 
-/**
- * Get Gemini models
- */
-export function handleGetGeminiModels(req: Request, res: Response) {
-  try {
-    const models = getGeminiModels();
-    res.json(models);
-  } catch (error) {
-    console.error('Get Gemini models error:', error);
-    res.status(500).json({
-      error: {
-        code: 500,
-        message: 'Internal server error',
-        status: 'INTERNAL'
-      }
-    });
+export const handleGeminiRequest = (req: Request, res: Response) => {
+  const { contents } = req.body;
+
+  if (!contents) {
+    return res.status(400).json({ error: 'Invalid request body' });
   }
-}
 
-/**
- * Generate content
- */
-export function handleGenerateContent(req: Request, res: Response) {
-  try {
-    const request: GeminiGenerateContentRequest = req.body;
+  const responseText = 'This is a mock response from the Gemini API.';
 
-    // Basic validation
-    if (!request.contents || request.contents.length === 0) {
-      return res.status(400).json({
-        error: {
-          code: 400,
-          message: 'Request must contain at least one content item',
-          status: 'INVALID_ARGUMENT'
-        }
-      });
-    }
+  const response = {
+    candidates: [
+      {
+        content: {
+          parts: [
+            {
+              text: responseText,
+            },
+          ],
+          role: 'model',
+        },
+        finishReason: 'STOP',
+        index: 0,
+        safetyRatings: [
+          {
+            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            probability: 'NEGLIGIBLE',
+          },
+          {
+            category: 'HARM_CATEGORY_HATE_SPEECH',
+            probability: 'NEGLIGIBLE',
+          },
+          {
+            category: 'HARM_CATEGORY_HARASSMENT',
+            probability: 'NEGLIGIBLE',
+          },
+          {
+            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            probability: 'NEGLIGIBLE',
+          },
+        ],
+      },
+    ],
+    usageMetadata: {
+      promptTokenCount: 10,
+      candidatesTokenCount: 5,
+      totalTokenCount: 15,
+    },
+  };
 
-    // Check if streaming is requested
-    const isStreaming = req.url.includes('streamGenerateContent') || req.query.alt === 'sse';
-
-    if (isStreaming) {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-
-      const stream = streamGenerateContent(request);
-      for (const chunk of stream) {
-        res.write(chunk);
-      }
-      res.end();
-      return;
-    }
-
-    // Non-streaming response
-    const response = generateContent(request);
-
-    // Check if it's an error response
-    if ('error' in response) {
-      return res.status(response.error.code).json(response);
-    }
-
-    res.json(response);
-
-  } catch (error) {
-    console.error('Generate content error:', error);
-    res.status(500).json({
-      error: {
-        code: 500,
-        message: 'Internal server error',
-        status: 'INTERNAL'
-      }
-    });
-  }
-}
+  res.json(response);
+};

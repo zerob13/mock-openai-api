@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
-import { ChatCompletionRequest, ImageGenerationRequest } from '../types';
+import { ChatCompletionRequest, ImageGenerationRequest } from '../types/index.js';
 import {
   getModels,
   createChatCompletion,
   createChatCompletionStream,
   createToolCallResponseStream,
   generateImage
-} from '../services/openaiService';
-import { findModelById } from '../utils/helpers';
+} from '../services/openaiService.js';
+import { findModelById } from '../utils/helpers.js';
 
 /**
  * Get model list
@@ -185,6 +185,6 @@ export function handleHealthCheck(req: Request, res: Response) {
     status: 'ok',
     message: 'Mock OpenAI API server is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.6'
   });
 } 

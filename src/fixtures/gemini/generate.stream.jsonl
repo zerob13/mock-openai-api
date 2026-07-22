@@ -1,2 +1,0 @@
-{"data":{"candidates":[{"content":{"role":"model","parts":[{"text":"Hello from "}]},"index":0}]}}
-{"data":{"candidates":[{"content":{"role":"model","parts":[{"text":"Gemini mock."}]},"index":0,"finishReason":"STOP"}],"responseId":"gemini_mock_0001"}}

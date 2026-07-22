@@ -1,4 +1,0 @@
-{"event":"message_start","data":{"type":"message_start","message":{"id":"msg_mock_0001","type":"message","role":"assistant","content":[]}}}
-{"event":"content_block_start","data":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_mock_0001","name":"get_order","input":{}}}}
-{"event":"content_block_delta","data":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"order_id\":\"A100\"}"}}}
-{"event":"message_stop","data":{"type":"message_stop"}}
