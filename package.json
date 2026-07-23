@@ -70,7 +70,7 @@
   "overrides": {
     "axios": "1.18.1",
     "js-cookie": "3.0.8",
-    "js-yaml": "4.3.0",
+    "js-yaml": "5.2.2",
     "lodash": "4.18.1",
     "uuid": "13.0.1"
   }
