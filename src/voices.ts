@@ -100,6 +100,8 @@ export function createVoiceHandlers(): { create: RequestHandler; remove: Request
   const create: RequestHandler = async (request: Request, response: Response) => {
     const voiceRequest = await readRequest(request).catch(() => undefined)
     if (!voiceRequest) {
+      // The unread rest of the body may still be on the wire, so close the connection once the error is sent.
+      response.set('Connection', 'close')
       return sendOpenAiError(response, 400, 'Malformed multipart/form-data body')
     }
     const type = voiceRequest.fields.type ?? 'audio_sample'

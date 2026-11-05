@@ -200,6 +200,53 @@ describe('POST /v1/audio/voices', () => {
   })
 })
 
+describe('POST /v1/audio/voices multipart limits', () => {
+  const sample = new Blob([new Uint8Array([0xff, 0xfb, 0x90, 0xc4])], { type: 'audio/mpeg' })
+
+  function post(baseUrl: string, form: FormData): Promise<Response> {
+    return fetch(`${baseUrl}/v1/audio/voices`, { method: 'POST', body: form })
+  }
+
+  function formWith(mutate: (form: FormData) => void): FormData {
+    const form = new FormData()
+    form.append('name', 'Narrator')
+    form.append('consent', 'cons_1234')
+    form.append('audio_sample', sample, 'sample')
+    mutate(form)
+    return form
+  }
+
+  it.each([
+    ['too many fields', (form: FormData) => {
+      for (let index = 0; index < 20; index++) form.append(`extra_${index}`, 'x')
+    }],
+    ['too many files', (form: FormData) => form.append('second_sample', sample, 'second')],
+    ['a field over 16 KiB', (form: FormData) => form.append('prompt', 'a'.repeat(17 * 1024))],
+    ['a body far over the sample limit', (form: FormData) => {
+      form.set('audio_sample', new Blob([new Uint8Array(12 * 1024 * 1024)], { type: 'audio/mpeg' }), 's')
+    }],
+  ])('should reject %s with 400 and close the connection', async (_label, mutate) => {
+    const baseUrl = await start()
+
+    const response = await post(baseUrl, formWith(mutate))
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('connection')).toBe('close')
+    expect((await response.json()).error.message).toBe('Malformed multipart/form-data body')
+  })
+
+  it('should keep serving requests after rejecting an oversized body', async () => {
+    const baseUrl = await start()
+    await post(baseUrl, formWith((form) => {
+      for (let index = 0; index < 20; index++) form.append(`extra_${index}`, 'x')
+    }))
+
+    const response = await post(baseUrl, formWith(() => undefined))
+
+    expect(response.status).toBe(200)
+  })
+})
+
 describe('DELETE /v1/audio/voices/{voice_id}', () => {
   it('should delete a created voice', async () => {
     const baseUrl = await start()
