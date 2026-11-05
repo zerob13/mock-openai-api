@@ -233,6 +233,17 @@ curl -X POST http://localhost:3000/v1/images/generations \
 - `POST /v1/images/generations` - Generate images
 - `POST /images/generations` - Compatible endpoint
 
+### Speech
+- `POST /v1/audio/speech` - Returns silent audio; requires `model`, `input` and `voice`, and `response_format` may be `mp3` (default), `opus`, `aac`, `flac`, `wav` or `pcm`
+- `POST /audio/speech` - Compatible endpoint
+
+### Voices
+- `POST /v1/audio/voices` - Create a voice from a `prompt` (JSON or multipart) or from an `audio_sample` with a `consent` ID (multipart, sample up to 10 MiB); the sample is validated and discarded
+- `DELETE /v1/audio/voices/{voice_id}` - Delete a voice; deleting it again returns 404
+- `POST /audio/voices` and `DELETE /audio/voices/{voice_id}` - Compatible endpoints
+
+Voices live in memory and are lost on restart. `/v1/audio/speech` does not use them yet.
+
 ### Health Check
 - `GET /health` - Server health status
 

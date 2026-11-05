@@ -22,6 +22,8 @@ import routes from './routes/index.js'
 import { GATEWAY_PROTOCOLS, type GatewayProtocol, type ReplaySpeed, type RuntimeConfig, RuntimeState } from './runtime.js'
 import { compileScenario, type CompiledResponse, type ScenarioV1 } from './scenario.js'
 import { ScenarioStore } from './scenario-store.js'
+import { handleSpeech } from './speech.js'
+import { createVoiceHandlers } from './voices.js'
 
 declare global {
   var verboseLogging: boolean
@@ -591,7 +593,14 @@ export function createApiApp(context: GatewayContext): express.Express {
 
   app.use(express.json({ limit: '10mb' }))
   app.use(express.urlencoded({ extended: true }))
-  app.get('/', (_request, response) => {
+  app.post('/v1/audio/speech', handleSpeech)
+  app.post('/audio/speech', handleSpeech)
+  const voices = createVoiceHandlers()
+  app.post('/v1/audio/voices', voices.create)
+  app.post('/audio/voices', voices.create)
+  app.delete('/v1/audio/voices/:voice_id', voices.remove)
+  app.delete('/audio/voices/:voice_id', voices.remove)
+  app.get('/',(_request, response) => {
     response.json({
       message: 'Mock OpenAI API Server',
       status: 'running',
